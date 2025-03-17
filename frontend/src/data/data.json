@@ -1,0 +1,54 @@
+{
+  "courses": [
+    {
+      "id": 1,
+      "title": "Guitar Fundamentals",
+      "slug": "guitar-fundamentals",
+      "description": "Learn the basics of playing guitar with our comprehensive beginner's course.",
+      "price": 99.99,
+      "instructor": "John Doe",
+      "isFeatured": true,
+      "image": "https://picsum.photos/200"
+    },
+    {
+      "id": 2,
+      "title": "Piano Mastery",
+      "slug": "piano-mastery",
+      "description": "Develop your piano skills from beginner to advanced levels with expert guidance.",
+      "price": 129.99,
+      "instructor": "Jane Smith",
+      "isFeatured": false,
+      "image": "https://picsum.photos/200"
+    },
+    {
+      "id": 3,
+      "title": "Photography Basics",
+      "slug": "photography-basics",
+      "description": "Master the fundamentals of photography, including composition, lighting, and editing.",
+      "price": 79.99,
+      "instructor": "Alex Johnson",
+      "isFeatured": true,
+      "image": "https://picsum.photos/200"
+    },
+    {
+      "id": 4,
+      "title": "Web Development Bootcamp",
+      "slug": "web-development-bootcamp",
+      "description": "Become a full-stack web developer with hands-on projects and real-world applications.",
+      "price": 199.99,
+      "instructor": "Chris Lee",
+      "isFeatured": true,
+      "image": "https://picsum.photos/200"
+    },
+    {
+      "id": 5,
+      "title": "Digital Marketing Essentials",
+      "slug": "digital-marketing-essentials",
+      "description": "Learn SEO, social media marketing, and advertising strategies for digital success.",
+      "price": 89.99,
+      "instructor": "Sarah Brown",
+      "isFeatured": false,
+      "image": "https://picsum.photos/200"
+    }
+  ]
+}
