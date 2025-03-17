@@ -1,7 +1,81 @@
-import React from "react";
+"use client";
 
-const profile = () => {
-  return <div>profile page. </div>;
-};
+import { useState, useEffect } from "react";
+import {
+  auth,
+  googleProvider,
+  signInWithPopup,
+  signOut,
+} from "@/utils/firebase";
+import { User } from "firebase/auth";
 
-export default profile;
+export default function ProfilePage() {
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      setUser(user);
+      console.log("User updated:", user); // debug step
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log("Login successful:", result.user);
+      setUser(result.user);
+    } catch (error) {
+      console.error("Login Error:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-black">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 shadow-md rounded-lg p-6">
+        {user ? (
+          <div className="flex flex-col items-center text-center">
+            <img
+              src={user.photoURL || "/default-profile.png"}
+              alt="Profile"
+              className="w-24 h-24 rounded-full border border-gray-300"
+            />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-4">
+              {user.displayName}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300">{user.email}</p>
+
+            <button
+              className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              onClick={handleLogout}
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              You are not logged in
+            </h1>
+            <button
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              onClick={handleLogin}
+            >
+              Sign in with Google
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

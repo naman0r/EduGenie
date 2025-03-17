@@ -6,7 +6,7 @@ export default function Home() {
     <>
       <div className="min-h-screen bg-black/[0.96] antialiased ">
         <HeroSection />
-        <GoogleLogin />
+        {/* <GoogleLogin /> */}
       </div>
     </>
   );

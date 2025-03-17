@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  HoveredLink,
-  Menu,
-  MenuItem,
-  ProductItem,
-} from "@/components/ui/navbar-menu";
+import { Menu, MenuItem } from "@/components/ui/navbar-menu";
 import { cn } from "@/utils/cn";
 import Link from "next/link";
 import {
@@ -20,32 +15,20 @@ function NavBar({ className }: { className?: string }) {
   const [active, setActive] = useState<string | null>(null);
   const [user, setUser] = useState(auth.currentUser);
 
-  // Track user authentication state
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       setUser(user);
     });
+    console.log(user);
     return () => unsubscribe();
   }, []);
 
-  // Handle Google Login
   const handleLogin = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       setUser(result.user);
-      console.log("User Info:", result.user);
     } catch (error) {
       console.error("Login Error:", error);
-    }
-  };
-
-  // Handle Logout
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-    } catch (error) {
-      console.error("Logout Error:", error);
     }
   };
 
@@ -56,22 +39,14 @@ function NavBar({ className }: { className?: string }) {
       <div>
         <Menu setActive={setActive}>
           <Link href="/">
-            <MenuItem
-              setActive={setActive}
-              active={active}
-              item="Home"
-            ></MenuItem>
+            <MenuItem setActive={setActive} active={active} item="Home" />
           </Link>
           <MenuItem
             setActive={setActive}
             active={active}
             item="Get Started Now"
-          ></MenuItem>
-          <MenuItem
-            setActive={setActive}
-            active={active}
-            item="Contact us"
-          ></MenuItem>
+          />
+          <MenuItem setActive={setActive} active={active} item="Contact us" />
 
           {/* Profile Section */}
           {user ? (
@@ -80,19 +55,21 @@ function NavBar({ className }: { className?: string }) {
                 <img
                   src={
                     user.photoURL ||
-                    "https://cdn.vectorstock.com/i/1000v/92/16/default-profile-picture-avatar-user-icon-vector-46389216.jpg"
+                    "https://cdn1.iconfinder.com/data/icons/elevator/154/elevator-user-man-ui-round-login-512.png"
                   }
                   alt="Profile"
-                  className="w-8 h-8 rounded-full"
+                  className="w-8 h-8 rounded-full border border-gray-300"
                 />
               </Link>
             </div>
           ) : (
-            <MenuItem
-              setActive={setActive}
-              active={active}
-              item="Login/Sign up"
-            />
+            <Link href="/profile">
+              <MenuItem
+                setActive={setActive}
+                active={active}
+                item="Login/Sign up"
+              />
+            </Link>
           )}
         </Menu>
       </div>
