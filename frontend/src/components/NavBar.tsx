@@ -41,11 +41,15 @@ function NavBar({ className }: { className?: string }) {
           <Link href="/">
             <MenuItem setActive={setActive} active={active} item="Home" />
           </Link>
-          <MenuItem
-            setActive={setActive}
-            active={active}
-            item="Get Started Now"
-          />
+
+          <Link href="/docs">
+            <MenuItem
+              setActive={setActive}
+              active={active}
+              item="Get Started Now"
+            />
+          </Link>
+
           <MenuItem setActive={setActive} active={active} item="Contact us" />
 
           {/* Profile Section */}
