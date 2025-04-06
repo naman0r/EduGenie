@@ -1,5 +1,7 @@
 # Hackverse.ai - Project Requirements Document (PRD)
 
+- social feature: find mentor pairings for projects.
+
 ## **1. Overview**
 
 **Hackverse.ai** is a real-time collaborative whiteboard and project management tool designed for hackathons and team projects. It enables seamless brainstorming, coding collaboration, and task tracking while integrating AI-powered research, GitHub connectivity, and Figma imports.
