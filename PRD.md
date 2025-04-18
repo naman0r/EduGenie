@@ -1,155 +1,145 @@
-# Hackverse.ai - Project Requirements Document (PRD)
+**Product Requirements Document (PRD)**
 
-- social feature: find mentor pairings for projects.
-
-## **1. Overview**
-
-**Hackverse.ai** is a real-time collaborative whiteboard and project management tool designed for hackathons and team projects. It enables seamless brainstorming, coding collaboration, and task tracking while integrating AI-powered research, GitHub connectivity, and Figma imports.
-
-## **2. Objectives**
-
-- Provide a **real-time, interactive** whiteboard for teams to collaborate.
-- Enable **seamless brainstorming, code collaboration, and research assistance**.
-- Integrate with **GitHub for code review, Figma for design sync, and Firebase for real-time updates**.
-- Include **AI-powered project idea generation, workflow automation, and market research**.
-- Offer **task management and progress tracking** to enhance productivity.
-- Implement **Google OAuth authentication and Stripe for premium features**.
-
-## **3. Key Features**
-
-### **3.1 Whiteboard & Collaboration**
-
-- Live **drawing, sticky notes, and text-based brainstorming**.
-- **Multi-user synchronization** using WebSockets.
-- **Save and reload** boards for ongoing projects.
-- **Real-time annotation and commenting**.
-
-### **3.2 AI-Powered Research & Assistance**
-
-- **Project idea generation** based on themes and timelines.
-- **AI-assisted code review & formatting suggestions**.
-- **Market research and feasibility analysis** for projects.
-- **Workflow visualization with AI-powered flowcharts**.
-
-### **3.3 GitHub Integration**
-
-- **Live code review** with AI-driven feedback.
-- **Push updates directly from the whiteboard** to GitHub.
-- **Edit repository files** like `README.md` directly within the app.
-
-### **3.4 Task Management & Progress Tracking**
-
-- Assign tasks like `@user, implement API, due: March 20`.
-- **Track project phases** (Idea > MVP > Testing > Deployment).
-- **Auto-generated editable flowcharts**.
-
-### **3.5 Figma Plugin & Design-to-Code Workflow**
-
-- **Import/export Figma designs** to the whiteboard.
-- **Live updates between Figma and Hackverse.ai**.
-
-### **3.6 Google OAuth & Payment Integration**
-
-- **User authentication via Google OAuth**.
-- **Subscription-based premium features using Stripe API**.
-
-### **3.7 Video & Media Support**
-
-- **Embedded video recording** for async updates.
-- **Screen capture with annotation tools**.
-
-## **4. Tech Stack**
-
-### **Frontend**
-
-- **Next.js (React)**
-- **TailwindCSS / Chakra UI**
-- **Socket.io-client for WebSockets**
-
-### **Backend**
-
-- **FastAPI / Flask** (FastAPI preferred for async support)
-- **WebSockets (Socket.io)**
-- **Supabase for database management**
-- **Stripe API for payments**
-- **Google OAuth for authentication**
-
-### **Database**
-
-- **Firebase (for real-time updates & board storage)**
-- **Supabase (for structured data: user profiles, task management, project metadata)**
-
-## **5. API Endpoints**
-
-### **Authentication & User Management**
-
-| Method | Endpoint            | Functionality                |
-| ------ | ------------------- | ---------------------------- |
-| `POST` | `/api/auth/login`   | User login with Google OAuth |
-| `GET`  | `/api/user/profile` | Retrieve user profile        |
-
-### **Whiteboard Collaboration**
-
-| Method | Endpoint          | Functionality                           |
-| ------ | ----------------- | --------------------------------------- |
-| `POST` | `/api/board/save` | Save board data                         |
-| `GET`  | `/api/board/load` | Load a saved board                      |
-| `WS`   | `/ws/board/:id`   | WebSocket connection for real-time sync |
-
-### **AI Assistance & GitHub Integration**
-
-| Method | Endpoint                 | Functionality          |
-| ------ | ------------------------ | ---------------------- |
-| `POST` | `/api/ai/generate-ideas` | AI project suggestions |
-| `POST` | `/api/github/review`     | AI code review         |
-| `POST` | `/api/github/push`       | Push changes to GitHub |
-
-### **Task Management & Progress Tracking**
-
-| Method | Endpoint         | Functionality        |
-| ------ | ---------------- | -------------------- |
-| `POST` | `/api/tasks/add` | Assign a new task    |
-| `GET`  | `/api/tasks`     | Fetch assigned tasks |
-
-### **Figma & Stripe Integration**
-
-| Method | Endpoint                  | Functionality          |
-| ------ | ------------------------- | ---------------------- |
-| `POST` | `/api/figma/import`       | Import Figma design    |
-| `POST` | `/api/payments/subscribe` | Handle Stripe payments |
-
-## **6. Deployment Plan**
-
-- **Frontend:** Deploy on **Vercel**.
-- **Backend:** Deploy on **Railway/Render**.
-- **Database:** Firebase & Supabase for data persistence.
-
-## **7. Challenges & Considerations**
-
-- **WebSocket Optimization**: Reducing latency in real-time collaboration.
-- **Data Conflicts**: Handling concurrent edits to whiteboards & files.
-- **GitHub API Rate Limits**: Managing API calls efficiently.
-- **AI Accuracy**: Ensuring relevant AI suggestions for projects.
-
-## **8. Roadmap & Timeline**
-
-| Phase       | Tasks                                               | Timeline  |
-| ----------- | --------------------------------------------------- | --------- |
-| **Phase 1** | Core Infrastructure (Frontend, Backend, WebSockets) | 2-3 weeks |
-| **Phase 2** | Whiteboard & Collaboration                          | 3-4 weeks |
-| **Phase 3** | AI Research & GitHub Integration                    | 4-5 weeks |
-| **Phase 4** | Task Management & UI Enhancements                   | 3-4 weeks |
-| **Phase 5** | Figma Plugin & Stripe Payments                      | 3-4 weeks |
-| **Phase 6** | Testing & Deployment                                | 2-3 weeks |
-
-## **9. Next Steps**
-
-1. **Set up Next.js & FastAPI with WebSockets.**
-2. **Develop UI Wireframes & Component Design.**
-3. **Integrate Firebase & Supabase for real-time storage.**
-4. **Build WebSocket-based whiteboard sync.**
-5. **Implement AI-powered features and GitHub API.**
+**Product Name**: EduGenie (working title)
 
 ---
 
-This PRD provides a structured blueprint for developing Hackverse.ai. Let me know if you want any refinements or additional details! 🚀
+## 1. Purpose & Background
+
+**Objective:** Build an AI-powered study planning web application that helps students streamline academic preparation by automatically transforming course materials into personalized study plans, question decks, and calendar events.
+
+**Background:** Students juggle multiple courses each semester, manually extracting key dates, creating flashcards, and devising study schedules. This process is time-consuming and often suboptimal. StudyGenie leverages AI to automate syllabus analysis and generate actionable study resources, freeing students to focus on learning.
+
+---
+
+## 2. MVP Scope & Goals
+
+- **Scope:** Deliver a lean, usable version focusing on core workflows: class enrollment input, syllabus ingestion, AI-driven study plan creation, flashcard deck generation, and calendar synchronization.
+- **Goals:**
+  1. Validate demand for AI-backed syllabus parsing.
+  2. Ensure generated plans and decks are accurate and usable.
+  3. Achieve seamless Google Calendar integration for key dates.
+
+---
+
+## 3. Target Audience & Personas
+
+**Primary Users:**
+
+- Undergraduate and graduate students managing 3–6 courses per semester.
+- Busy learners seeking automated study aids.
+
+**Persona Example:**
+
+- **Name:** Alex, Junior Computer Science Student
+- **Pain Points:** Forgetting assignment deadlines, creating flashcards from scratch, ad-hoc study sessions.
+- **Needs:** Consolidated overview of syllabus, auto-generated study timeline, review materials.
+
+---
+
+## 4. User Stories
+
+1. **Semester Setup:**
+   - As a student, I want to input my courses for the semester so that the app knows which syllabi to process.
+2. **Syllabus Upload:**
+   - As a student, I want to upload PDF or DOCX syllabus files so that the system can extract dates, topics, and assessment details.
+3. **Study Plan Generation:**
+   - As a student, I want the AI to create a personalized week-by-week study plan so that I have structured preparation for lectures, assignments, and exams.
+4. **Flashcard Deck Creation:**
+   - As a student, I want AI-generated quizlet-style decks based on syllabus topics and my notes so that I can review effectively.
+5. **Calendar Sync:**
+   - As a student, I want to sync key dates (assignments, exams) to my Google Calendar so that I receive timely reminders.
+
+---
+
+## 5. Features & Requirements
+
+### 5.1 Core MVP Features
+
+| Feature                     | Description                                                | Priority |
+| --------------------------- | ---------------------------------------------------------- | -------- |
+| Course Input Form           | Manual entry of course code, title, instructor             | High     |
+| Syllabus Upload & Parser    | Upload multiple file types; extract dates/topics using NLP | High     |
+| AI Study Plan Generator     | Generate multi-week schedule mapped to syllabus content    | High     |
+| Flashcard Deck Export       | Auto-create decks exportable in Quizlet format             | High     |
+| Google Calendar Integration | OAuth-based sync of extracted dates                        | High     |
+
+### 5.2 In-Scope (MVP)
+
+- PDF & DOCX syllabus support
+- Basic natural language date/topic extraction
+- Plan broken into weekly milestones
+- Exportable CSV or JSON deck for Quizlet import
+- Two-way Google Calendar write (user approves events)
+
+### 5.3 Out-of-Scope (Future)
+
+- Mobile app native clients
+- Rich media flashcards (images/audio)
+- Collaboration or group study modes
+- Advanced analytics / progress tracking
+
+---
+
+## 6. Functional Requirements
+
+1. **Authentication & Authorization**
+   - Students sign up via email/password or Google OAuth.
+2. **Course Dashboard**
+   - Display list of registered courses and status of syllabus processing.
+3. **File Management**
+   - Secure storage of uploaded syllabi; user can re-upload or remove.
+4. **Parsing Engine**
+   - NLP service identifies dates, topics, deliverables from syllabus text.
+5. **AI Module**
+   - Generates study plan and question prompts using GPT-based APIs.
+6. **Export & Integration**
+   - Provide JSON/CSV export for flashcard decks.
+   - Connect to Google Calendar API to push events.
+
+---
+
+## 7. Non-Functional Requirements
+
+- **Performance:** Syllabus parsing and plan generation complete within 30 seconds per course.
+- **Security:** All uploads and calendar tokens stored encrypted; comply with OAuth best practices.
+- **Usability:** Intuitive UI with guided onboarding for first-time users.
+- **Scalability:** Modular architecture to support adding more AI functions.
+
+---
+
+## 8. Success Metrics
+
+- **Adoption:** 200 MVP sign-ups in first month.
+- **Engagement:** 80% of users complete at least one study plan.
+- **Accuracy:** ≥90% of calendar events correctly parsed.
+- **Satisfaction:** Avg. user rating ≥4/5 via in-app survey.
+
+---
+
+## 9. Timeline & Milestones (Q2 2025)
+
+| Week | Milestone                             | Deliverable                 |
+| ---- | ------------------------------------- | --------------------------- |
+| 1    | Project kickoff & architecture design | System design doc           |
+| 2–3  | Auth & course dashboard               | User login; course CRUD UI  |
+| 4–5  | Syllabus upload & parsing             | Parser prototype, tests     |
+| 6–7  | AI study plan module                  | Plan generator API, UI      |
+| 8    | Flashcard export functionality        | Export tested, validated    |
+| 9    | Google Calendar sync                  | OAuth flow, event push      |
+| 10   | End-to-end MVP demo & user testing    | Internal demo, feedback log |
+
+---
+
+## 10. Risks & Assumptions
+
+- **Assumptions:**
+  - Access to high-quality NLP & GPT APIs.
+  - Students have digital syllabi.
+- **Risks:**
+  - Parsing inaccuracies on varied syllabus formats.
+  - Calendar API rate limits; OAuth friction.
+
+---
+
+_End of PRD for EduGenie MVP._
