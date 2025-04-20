@@ -41,6 +41,10 @@ export default function ProfilePage() {
     string | null
   >(null);
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  const [testEventFeedback, setTestEventFeedback] = useState<string | null>(
+    null
+  );
+  const [isCreatingTestEvent, setIsCreatingTestEvent] = useState(false);
 
   // Form state for editing
   const [formData, setFormData] = useState<Partial<UserProfile>>({
@@ -216,6 +220,69 @@ export default function ProfilePage() {
     }
   };
 
+  // Function to create a test event
+  const handleCreateTestEvent = async () => {
+    if (!user || !user.uid) {
+      setTestEventFeedback("Error: Not logged in.");
+      return;
+    }
+    if (!isCalendarConnected) {
+      setTestEventFeedback("Error: Google Calendar not connected.");
+      return;
+    }
+
+    setIsCreatingTestEvent(true);
+    setTestEventFeedback(null);
+
+    // Create dates for the next hour in ISO format
+    const startTime = new Date();
+    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Add 1 hour
+
+    // Format dates as ISO strings (required by Google Calendar API)
+    // Using toISOString() produces UTC time ('Z' suffix)
+    const startISO = startTime.toISOString();
+    const endISO = endTime.toISOString();
+
+    const eventData = {
+      summary: "EduGenie Test Event",
+      description: "This is a test event created from the EduGenie app.",
+      start_datetime: startISO,
+      end_datetime: endISO,
+    };
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/users/${user.uid}/calendar/events`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(eventData),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.detail || `Failed to create event (HTTP ${response.status})`
+        );
+      }
+
+      console.log("Event creation response:", result);
+      setTestEventFeedback(
+        `Success! Event '${result.event_details?.summary}' created. Check your Google Calendar.`
+      );
+      // Optionally include link: result.event_details?.htmlLink
+    } catch (err: any) {
+      console.error("Failed to create test event:", err);
+      setTestEventFeedback(`Error creating test event: ${err.message}`);
+    } finally {
+      setIsCreatingTestEvent(false);
+    }
+  };
+
   // Render loading state
   if (isLoading && !profile && !error) {
     // Show loading only if no profile/error yet
@@ -245,7 +312,7 @@ export default function ProfilePage() {
 
   // Render profile display or edit form
   return (
-    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16">
+    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16 pb-20">
       <h1 className="text-3xl font-bold mb-6 text-center">Your Profile</h1>
 
       {/* Display Calendar Connection Status */}
@@ -458,9 +525,32 @@ export default function ProfilePage() {
               Integrations
             </h3>
             {isCalendarConnected ? (
-              <div className="flex items-center justify-between p-3 bg-green-800/50 rounded">
-                <p className="text-green-100">Google Calendar Connected</p>
-                {/* Optionally add a disconnect button later */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-green-800/50 rounded">
+                  <p className="text-green-100">Google Calendar Connected</p>
+                </div>
+                {/* Add Test Event Button */}
+                <button
+                  onClick={handleCreateTestEvent}
+                  className="w-full px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition duration-200 disabled:opacity-50"
+                  disabled={isCreatingTestEvent}
+                >
+                  {isCreatingTestEvent
+                    ? "Creating Test Event..."
+                    : "Create Test Calendar Event"}
+                </button>
+                {/* Feedback Area for Test Event */}
+                {testEventFeedback && (
+                  <p
+                    className={`text-sm ${
+                      testEventFeedback.startsWith("Error")
+                        ? "text-red-400"
+                        : "text-green-400"
+                    }`}
+                  >
+                    {testEventFeedback}
+                  </p>
+                )}
               </div>
             ) : (
               <button
