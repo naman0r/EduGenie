@@ -8,11 +8,4 @@
 
 ## DDL for the Supabase Tables:
 
-create table users (
-google_id varchar primary key,
-email varchar unique not null,
-full_name varchar,
-avatar_url text,
-created_at timestamp with time zone default timezone('utc'::text, now()),
-last_logged_in timestamp with time zone default timezone('utc'::text, now())
-);
+look at schema.sql. please keep in mind, that this file is not actually being run, but is there just for reference.
