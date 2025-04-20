@@ -8,6 +8,10 @@ from pydantic import BaseModel
 from typing import Optional
 import logging
 from uuid import UUID # Import UUID
+from google_auth_oauthlib.flow import Flow
+from google.auth.transport.requests import Request as GoogleAuthRequest # Alias to avoid name clash
+from fastapi import Request as FastAPIRequest # Alias FastAPI's Request
+from fastapi.responses import RedirectResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +39,7 @@ app = FastAPI()
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Your Next.js frontend URL
+    allow_origins=["http://localhost:3000"],  #  Next.js frontend URL; add deployment url when deployed. 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,7 +53,7 @@ class UserAuth(BaseModel):
     avatar_url: Optional[str] = None
 
 # Pydantic model for profile update
-class UserProfileUpdate(BaseModel):
+class UserProfileUpdate(BaseModel): # abstractions because avi told me to learn 
     academic_year: Optional[int] = None
     academic_level: Optional[str] = None
     institution: Optional[str] = None
@@ -71,6 +75,15 @@ class ClassCreate(BaseModel):
     name: str
     code: Optional[str] = None
     instructor: Optional[str] = None
+
+# --- Google Calendar Config ---
+# IMPORTANT: Ensure this file is in .gitignore and the backend directory!
+CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'client_secret_377799709353-3e316d1al2o05ju3k84ip6ud0hfu3p7l.apps.googleusercontent.com.json') # USE YOUR ACTUAL FILENAME
+
+# Define the scopes your app needs
+SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+# The Redirect URI for the backend callback handler
+REDIRECT_URI = 'http://localhost:8000/oauth2callback'
 
 @app.get("/")
 async def root():
@@ -200,6 +213,102 @@ async def create_user_class(google_id: str, class_data: ClassCreate):
     except Exception as e:
         logger.error(f"Error creating class for user_id {google_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create class: {str(e)}")
+
+@app.get("/classes/{class_id}", response_model=ClassInfo)
+async def get_single_class(class_id: UUID):
+    # Note: No user check here for simplicity, assumes any valid class ID can be fetched.
+    # Add user authorization check if needed based on session/token.
+    try:
+        logger.info(f"Fetching details for class_id: {class_id}")
+        response = supabase.table("classes").select("*").eq("id", str(class_id)).maybe_single().execute() # Query by primary key 'id'
+        
+        if not response.data:
+            logger.warning(f"Class not found for ID: {class_id}")
+            raise HTTPException(status_code=404, detail="Class not found")
+        
+        logger.info(f"Class details found for ID: {class_id}")
+        return response.data
+        
+    except HTTPException as http_exc: # Re-raise HTTP exceptions
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Error fetching details for class_id {class_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch class details: {str(e)}")
+
+# --- Google Calendar Auth Endpoints ---
+
+@app.get("/auth/google/calendar/initiate")
+async def initiate_google_calendar_auth(google_id: str): # Get user ID to store in state
+    try:
+        if not os.path.exists(CLIENT_SECRETS_FILE):
+             logger.error(f"Client secrets file not found at: {CLIENT_SECRETS_FILE}")
+             raise HTTPException(status_code=500, detail="Server configuration error: Client secrets file missing.")
+             
+        # Create flow instance using client secrets file
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            redirect_uri=REDIRECT_URI
+        )
+        # Generate the authorization URL users will visit
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',  # Essential for getting a refresh token
+            prompt='consent',      # Force consent screen for refresh token
+            # Include user identifier in state to link tokens later safely
+            state=google_id # Pass the user's google_id in the state
+        )
+        
+        logger.info(f"Redirecting user {google_id} to Google for Calendar auth.")
+        # Redirect the user to Google's authorization page
+        return RedirectResponse(authorization_url)
+        
+    except Exception as e:
+        logger.error(f"Error initiating Google Calendar auth for user {google_id}: {str(e)}")
+        # Optionally redirect to a frontend error page
+        raise HTTPException(status_code=500, detail="Failed to initiate Google Calendar authentication.")
+
+@app.get("/oauth2callback") # Path must match REDIRECT_URI and Google Console config
+async def oauth2callback(request: FastAPIRequest, code: str, state: str): # Google adds 'code' and 'state'
+    # The 'state' should contain the user's google_id we passed
+    google_id = state
+    try:
+        logger.info(f"Received OAuth callback for user {google_id}...")
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            redirect_uri=REDIRECT_URI
+        )
+
+        # Exchange the authorization code for credentials
+        flow.fetch_token(code=code)
+        credentials = flow.credentials
+
+        logger.info(f"Successfully exchanged code for tokens for user {google_id}. Refresh token received: {bool(credentials.refresh_token)}")
+
+        # Store the credentials securely associated with the user
+        # IMPORTANT: Encrypt refresh_token before saving in production!
+        update_data = {
+            'google_refresh_token': credentials.refresh_token, # Store this long-term
+            'google_access_token': credentials.token,
+            'google_token_expiry': credentials.expiry.isoformat() if credentials.expiry else None
+        }
+
+        # Update the user's record in Supabase
+        response = supabase.table("users").update(update_data).eq("google_id", google_id).execute()
+
+        if not response.data:
+             logger.error(f"Failed to store Google tokens for user {google_id}. User not found or update failed.")
+             # Redirect user back to frontend with an error indicator
+             return RedirectResponse("http://localhost:3000/profile?google_auth_status=error_saving")
+
+        logger.info(f"Google Calendar tokens stored successfully for user {google_id}")
+        # Redirect user back to a relevant frontend page (e.g., profile or dashboard)
+        return RedirectResponse("http://localhost:3000/profile?google_auth_status=success")
+
+    except Exception as e:
+        logger.error(f"Error during Google OAuth callback for user {google_id}: {str(e)}")
+        # Redirect user back to frontend with an error indicator
+        return RedirectResponse("http://localhost:3000/profile?google_auth_status=callback_failed")
 
 if __name__ == "__main__":
     import uvicorn

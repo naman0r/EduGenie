@@ -14,6 +14,16 @@ CREATE TABLE users (
     plan_type VARCHAR(50) DEFAULT 'basic' NOT NULL -- 'basic' or 'premium' later on
 );
 
+-- Add columns for Google Calendar OAuth Tokens
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS google_refresh_token TEXT,
+ADD COLUMN IF NOT EXISTS google_access_token TEXT,
+ADD COLUMN IF NOT EXISTS google_token_expiry TIMESTAMPTZ;
+
+COMMENT ON COLUMN users.google_refresh_token IS 'Encrypted Google OAuth refresh token for Calendar access';
+COMMENT ON COLUMN users.google_access_token IS 'Temporary Google OAuth access token';
+COMMENT ON COLUMN users.google_token_expiry IS 'Expiry time for the Google access token';
+
 -- Table to store user classes
 CREATE TABLE classes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique ID for each class entry
