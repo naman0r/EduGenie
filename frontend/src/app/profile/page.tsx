@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation"; // Use next/navigation for App Router
+import { useRouter, useSearchParams } from "next/navigation"; // Import useSearchParams
 import { auth, signOut } from "@/utils/firebase"; // Import signOut
 
 // Define the structure of the user profile data
@@ -16,6 +16,8 @@ interface UserProfile {
   plan_type: string | null;
   created_at?: string;
   last_logged_in?: string;
+  // Add new fields from schema to potentially display status
+  google_refresh_token?: string | null;
 }
 
 // Define academic levels for the dropdown
@@ -29,11 +31,16 @@ const academicLevels = [
 
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams(); // Hook to read query params
   const [user, setUser] = useState<any | null>(null); // Firebase user object
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [calendarStatusMessage, setCalendarStatusMessage] = useState<
+    string | null
+  >(null);
+  const [isCalendarConnected, setIsCalendarConnected] = useState(false);
 
   // Form state for editing
   const [formData, setFormData] = useState<Partial<UserProfile>>({
@@ -74,14 +81,17 @@ export default function ProfilePage() {
             setProfile(null); // Ensure profile is null on error
           } else {
             const data = await response.json();
-            setProfile(data.user); // Assuming backend returns { user: {...} }
+            const userProfile: UserProfile = data.user;
+            setProfile(userProfile);
             // Initialize form data with fetched profile
             setFormData({
-              full_name: data.user.full_name || "",
-              academic_year: data.user.academic_year || undefined,
-              academic_level: data.user.academic_level || "",
-              institution: data.user.institution || "",
+              full_name: userProfile.full_name || "",
+              academic_year: userProfile.academic_year || undefined,
+              academic_level: userProfile.academic_level || "",
+              institution: userProfile.institution || "",
             });
+            // Check if calendar is already connected based on refresh token presence
+            setIsCalendarConnected(!!userProfile.google_refresh_token);
             setError(null); // Clear previous errors
           }
         } catch (err) {
@@ -100,8 +110,27 @@ export default function ProfilePage() {
       }
     });
 
+    // Check for Google Calendar auth status from query params ONCE on mount
+    const status = searchParams.get("google_auth_status");
+    if (status) {
+      if (status === "success") {
+        setCalendarStatusMessage("Google Calendar connected successfully!");
+        setIsCalendarConnected(true); // Assume connection if success param is present
+      } else if (status === "error_saving") {
+        setCalendarStatusMessage(
+          "Failed to save Google Calendar connection. Please try again."
+        );
+      } else if (status === "callback_failed") {
+        setCalendarStatusMessage(
+          "Google Calendar connection failed. Please try again."
+        );
+      }
+      // Clean the URL (optional, requires navigation)
+      // router.replace('/profile', { scroll: false });
+    }
+
     return () => unsubscribe(); // Cleanup subscription on unmount
-  }, [router]);
+  }, [router, searchParams]);
 
   // Handle form input changes
   const handleInputChange = (
@@ -177,6 +206,16 @@ export default function ProfilePage() {
     }
   };
 
+  // Function to initiate Google Calendar connection
+  const connectGoogleCalendar = () => {
+    if (user && user.uid) {
+      // Redirect to the backend initiation endpoint
+      window.location.href = `http://localhost:8000/auth/google/calendar/initiate?google_id=${user.uid}`;
+    } else {
+      setError("You must be logged in to connect Google Calendar.");
+    }
+  };
+
   // Render loading state
   if (isLoading && !profile && !error) {
     // Show loading only if no profile/error yet
@@ -208,6 +247,19 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16">
       <h1 className="text-3xl font-bold mb-6 text-center">Your Profile</h1>
+
+      {/* Display Calendar Connection Status */}
+      {calendarStatusMessage && (
+        <div
+          className={`mb-4 p-3 rounded text-center ${
+            calendarStatusMessage.includes("success")
+              ? "bg-green-800/70 text-green-100"
+              : "bg-red-800/70 text-red-100"
+          }`}
+        >
+          {calendarStatusMessage}
+        </div>
+      )}
 
       {isEditing || (error && profile === null) ? ( // Show form if editing or new user error
         <form
@@ -400,7 +452,36 @@ export default function ProfilePage() {
             </span>{" "}
             {profile?.plan_type || "basic"}
           </p>
-          <div className="flex justify-end space-x-3 pt-4">
+          {/* Google Calendar Connection Section */}
+          <div className="pt-4 mt-4 border-t border-gray-700">
+            <h3 className="text-lg font-semibold mb-2 text-gray-200">
+              Integrations
+            </h3>
+            {isCalendarConnected ? (
+              <div className="flex items-center justify-between p-3 bg-green-800/50 rounded">
+                <p className="text-green-100">Google Calendar Connected</p>
+                {/* Optionally add a disconnect button later */}
+              </div>
+            ) : (
+              <button
+                onClick={connectGoogleCalendar}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200 disabled:opacity-50 flex items-center justify-center space-x-2"
+                disabled={isLoading} // Disable while loading profile
+              >
+                {/* Basic Google Icon Placeholder */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M20.283 10.356h-8.327v3.451h4.792c-.446 2.193-2.313 3.453-4.792 3.453a5.27 5.27 0 0 1-5.279-5.28 5.27 5.27 0 0 1 5.279-5.279c1.259 0 2.397.447 3.29 1.178l2.6-2.599c-1.584-1.381-3.615-2.233-5.89-2.233a8.908 8.908 0 0 0-8.934 8.934 8.907 8.907 0 0 0 8.934 8.934c4.467 0 8.529-3.249 8.529-8.934 0-.528-.081-1.097-.202-1.625z"></path>
+                </svg>
+                <span>Connect Google Calendar</span>
+              </button>
+            )}
+          </div>
+          <div className="flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-700">
             <button
               onClick={() => setIsEditing(true)}
               className="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 transition duration-200"
