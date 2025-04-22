@@ -157,7 +157,7 @@ async def google_auth(user: UserAuth):
                 "avatar_url": user.avatar_url,
                 "created_at": datetime.utcnow().isoformat(),
                 "last_logged_in": datetime.utcnow().isoformat(),
-                "plan_type": "basic" # <<< Add default plan type here
+                "plan_type": "basic"  
             }
             new_user = supabase.table("users").insert(user_data_to_insert).execute()
             

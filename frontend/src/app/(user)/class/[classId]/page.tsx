@@ -15,10 +15,56 @@ interface ClassData {
   created_at: string;
 }
 
+// Define Task interface for mock data
+interface Task {
+  id: string;
+  title: string;
+  assigned_date: string;
+  deadline: string;
+  personal_completion_deadline: string;
+  status: "pending" | "in-progress" | "completed";
+}
+
+// Mock Task Data
+const mockTasks: Task[] = [
+  {
+    id: "task-1",
+    title: "Problem Set 1",
+    assigned_date: "2024-08-01",
+    deadline: "2024-08-15",
+    personal_completion_deadline: "2024-08-13",
+    status: "pending",
+  },
+  {
+    id: "task-2",
+    title: "Read Chapter 3",
+    assigned_date: "2024-08-05",
+    deadline: "2024-08-12",
+    personal_completion_deadline: "2024-08-11",
+    status: "in-progress",
+  },
+  {
+    id: "task-3",
+    title: "Midterm Paper Outline",
+    assigned_date: "2024-08-10",
+    deadline: "2024-08-25",
+    personal_completion_deadline: "2024-08-22",
+    status: "pending",
+  },
+  {
+    id: "task-4",
+    title: "Lab Report 1 (Completed)",
+    assigned_date: "2024-07-20",
+    deadline: "2024-08-05",
+    personal_completion_deadline: "2024-08-03",
+    status: "completed",
+  },
+];
+
 export default function ClassDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const classId = params.classId as string; // Assume it's a string
+  const classId = params.classId as string; // Assume it's a string for now, troubleshooting,
 
   const [user, setUser] = useState<User | null>(null);
   const [classDetails, setClassDetails] = useState<ClassData | null>(null);
@@ -134,14 +180,73 @@ export default function ClassDetailsPage() {
         </div>
       </div>
 
-      {/* Main Content Area (Placeholder for now) */}
+      {/* Main Content Area */}
       <div className="bg-gray-800/30 p-6 rounded-lg shadow-xl min-h-[400px]">
-        <h2 className="text-xl font-semibold mb-4">Class Content</h2>
+        <h2 className="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">
+          Upcoming Tasks & Assignments
+        </h2>
+
+        {/* Task List */}
+        <div className="space-y-4">
+          {mockTasks.length === 0 ? (
+            <p className="text-gray-400 italic">
+              No tasks added for this class yet.
+            </p>
+          ) : (
+            mockTasks.map((task) => (
+              <div
+                key={task.id}
+                className="bg-gray-700/50 p-4 rounded-md border border-gray-600 hover:bg-gray-700/70 transition duration-150"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-lg font-medium text-gray-100">
+                    {task.title}
+                  </h3>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      task.status === "completed"
+                        ? "bg-green-500/20 text-green-300"
+                        : task.status === "in-progress"
+                        ? "bg-yellow-500/20 text-yellow-300"
+                        : "bg-gray-500/20 text-gray-300"
+                    }`}
+                  >
+                    {task.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-1 text-sm text-gray-400">
+                  <div>
+                    Assigned:{" "}
+                    <span className="text-gray-300">{task.assigned_date}</span>
+                  </div>
+                  <div>
+                    Deadline:{" "}
+                    <span className="text-red-400 font-medium">
+                      {task.deadline}
+                    </span>
+                  </div>
+                  <div>
+                    Personal Goal:{" "}
+                    <span className="text-blue-400">
+                      {task.personal_completion_deadline}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Placeholder for future content */}
+        {/* <h2 className="text-xl font-semibold mt-8 mb-4 border-b border-gray-600 pb-2">
+          Other Class Content
+        </h2>
         <p className="text-gray-400">
           [Future content for this class will go here - e.g., syllabus upload
           section, generated study plans, notes integration, etc.]
-        </p>
-        {/* Example: Display Class ID for reference */}
+        </p> */}
+
+        {/* Display Class ID for reference */}
         <p className="text-xs text-gray-600 mt-10">
           Class ID: {classDetails.id}
         </p>
