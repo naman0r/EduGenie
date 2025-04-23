@@ -9,3 +9,5 @@
 ## DDL for the Supabase Tables:
 
 look at schema.sql. please keep in mind, that this file is not actually being run, but is there just for reference.
+
+If you wish to duplicate this project on your own computer, you will need to follow the steps below carefully.

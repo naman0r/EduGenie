@@ -1,21 +1,23 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request as FastAPIRequest
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
 from datetime import datetime, timezone
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Union
 import logging
 from uuid import UUID # Import UUID
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request as GoogleAuthRequest # Alias to avoid name clash
-from fastapi import Request as FastAPIRequest # Alias FastAPI's Request
 from fastapi.responses import RedirectResponse
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import json # Import json
+from fastapi import Query # Keep Query if still needed
+from fastapi import Depends, Header, Security # Removed Depends, Header, Security
+import jwt
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -79,6 +81,30 @@ class ClassCreate(BaseModel):
     name: str
     code: Optional[str] = None
     instructor: Optional[str] = None
+    
+    
+    
+    
+# pydantic model for resource creation
+class ResourceCreate(BaseModel):
+    class_id: UUID
+    user_id: str # *** ADD user_id BACK ***
+    type: str
+    name: str
+    content: dict
+
+# Pydantic model for resource response
+class ResourceInfo(BaseModel):
+    id: UUID
+    class_id: UUID
+    user_id: str
+    type: str
+    name: str
+    created_at: datetime
+    content: Optional[dict] = None # Content might be large, make optional for list view?
+
+    class Config:
+        orm_mode = True
 
 # --- Google Calendar Config ---
 # IMPORTANT: Ensure this file is in .gitignore and the backend directory!
@@ -168,10 +194,12 @@ async def google_auth(user: UserAuth):
         raise HTTPException(status_code=500, detail=f"Failed to process user: {str(e)}")
 
 @app.get("/users/{google_id}")
-async def get_user_profile(google_id: str):
+async def get_user_profile(
+    google_id: str # Remove current_google_id dependency
+):
     try:
         logger.info(f"Fetching profile for user_id: {google_id}")
-        user_profile = supabase.table("users").select("*").eq("google_id", google_id).maybe_single().execute()
+        user_profile = supabase.table("users").select("*" ).eq("google_id", google_id).maybe_single().execute()
         
         if not user_profile.data:
             logger.warning(f"User profile not found for ID: {google_id}")
@@ -179,14 +207,17 @@ async def get_user_profile(google_id: str):
         
         logger.info(f"Profile found for user_id: {google_id}")
         return {"user": user_profile.data}
-    except HTTPException as http_exc: # Re-raise HTTP exceptions
+    except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
         logger.error(f"Error fetching profile for user_id {google_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch user profile: {str(e)}")
 
 @app.put("/users/{google_id}")
-async def update_user_profile(google_id: str, profile_update: UserProfileUpdate):
+async def update_user_profile(
+    google_id: str,
+    profile_update: UserProfileUpdate # Remove current_google_id dependency
+):
     try:
         # Create update dict removing None values
         update_data = profile_update.dict(exclude_unset=True)
@@ -207,19 +238,20 @@ async def update_user_profile(google_id: str, profile_update: UserProfileUpdate)
         profile_response = await get_user_profile(google_id)
         return profile_response
         
-    except HTTPException as http_exc: # Re-raise HTTP exceptions
+    except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
         logger.error(f"Error updating profile for user_id {google_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update user profile: {str(e)}")
 
-# --- Class Endpoints ---
-
+# --- Class Endpoints (Remove Auth Dependency & Check) ---
 @app.get("/users/{google_id}/classes", response_model=list[ClassInfo])
-async def get_user_classes(google_id: str):
+async def get_user_classes(
+    google_id: str # Remove current_google_id dependency
+):
     try:
         logger.info(f"Fetching classes for user_id: {google_id}")
-        response = supabase.table("classes").select("*").eq("user_id", google_id).order("created_at", desc=True).execute()
+        response = supabase.table("classes").select("*" ).eq("user_id", google_id).order("created_at", desc=True).execute()
         
         # response.data will be a list of dictionaries
         logger.info(f"Found {len(response.data)} classes for user_id: {google_id}")
@@ -229,7 +261,10 @@ async def get_user_classes(google_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to fetch classes: {str(e)}")
 
 @app.post("/users/{google_id}/classes", response_model=ClassInfo, status_code=201)
-async def create_user_class(google_id: str, class_data: ClassCreate):
+async def create_user_class(
+    google_id: str,
+    class_data: ClassCreate # Remove current_google_id dependency
+):
     try:
         logger.info(f"Creating class for user_id: {google_id} with data: {class_data.dict()}")
         
@@ -252,12 +287,14 @@ async def create_user_class(google_id: str, class_data: ClassCreate):
         raise HTTPException(status_code=500, detail=f"Failed to create class: {str(e)}")
 
 @app.get("/classes/{class_id}", response_model=ClassInfo)
-async def get_single_class(class_id: UUID):
+async def get_single_class(
+    class_id: UUID # Remove current_google_id dependency
+):
     # Note: No user check here for simplicity, assumes any valid class ID can be fetched.
     # Add user authorization check if needed based on session/token.
     try:
         logger.info(f"Fetching details for class_id: {class_id}")
-        response = supabase.table("classes").select("*").eq("id", str(class_id)).maybe_single().execute() # Query by primary key 'id'
+        response = supabase.table("classes").select("*" ).eq("id", str(class_id)).maybe_single().execute() # Query by primary key 'id'
         
         if not response.data:
             logger.warning(f"Class not found for ID: {class_id}")
@@ -272,8 +309,7 @@ async def get_single_class(class_id: UUID):
         logger.error(f"Error fetching details for class_id {class_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch class details: {str(e)}")
 
-# --- Google Calendar Auth Endpoints ---
-
+# --- Google Calendar Auth Endpoints (Keep as is, internal logic doesn't use the dependency) ---
 @app.get("/auth/google/calendar/initiate")
 async def initiate_google_calendar_auth(google_id: str):
     try:
@@ -346,7 +382,7 @@ async def oauth2callback(request: FastAPIRequest, code: str, state: str):
         logger.error(f"Error during Google OAuth callback for user {google_id}: {str(e)}", exc_info=True)
         return RedirectResponse("http://localhost:3000/profile?google_auth_status=callback_failed")
 
-# --- Google Calendar API Utility (Modified) ---
+# --- Google Calendar API Utility (Keep as is, internal logic doesn't use the dependency) ---
 async def get_google_calendar_client(google_id: str):
     logger.info(f"Attempting to get Google Calendar client for user: {google_id}")
     
@@ -421,10 +457,12 @@ class CalendarEventCreate(BaseModel):
     # Add timeZone if needed, otherwise uses user's default calendar timezone
 
 
-# --- New Calendar Event Endpoint ---
-
+# --- New Calendar Event Endpoint (Remove Auth Dependency & Check) ---
 @app.post("/users/{google_id}/calendar/events", status_code=201)
-async def add_calendar_event(google_id: str, event_data: CalendarEventCreate):
+async def add_calendar_event(
+    google_id: str,
+    event_data: CalendarEventCreate # Remove current_google_id dependency
+):
     try:
         logger.info(f"Received request to add calendar event for user {google_id}: {event_data.summary}")
         # 1. Get authenticated calendar service client for the user
@@ -474,10 +512,6 @@ async def add_calendar_event(google_id: str, event_data: CalendarEventCreate):
              detail = "Invalid request to Google Calendar API. Check event data format."
         raise HTTPException(status_code=error.resp.status, detail=detail)
         
-    except HTTPException as http_exc:
-        # Re-raise exceptions from get_google_calendar_client
-        raise http_exc
-        
     except Exception as e:
         logger.error(f"Unexpected error creating calendar event for user {google_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create calendar event due to an internal server error.")
@@ -485,9 +519,62 @@ async def add_calendar_event(google_id: str, event_data: CalendarEventCreate):
 
 
 
-# --- Study Resources Endpoints ---
+# --- Study Resources Endpoints (Remove Auth Dependency & Check) ---
+@app.get('/users/{google_id}/resources', response_model=list[ResourceInfo])
+async def get_user_resources(
+    google_id: str,
+    class_id: Optional[UUID] = Query(None) # Remove current_google_id dependency
+):
+    try:
+        logger.info(f"Fetching resources for user {google_id}" + (f" in class {class_id}" if class_id else ""))
+        query = supabase.table("resources").select("*" ).eq("user_id", google_id)
+        
+        # Add class filter if class_id is provided
+        if class_id:
+            query = query.eq("class_id", str(class_id))
+            
+        response = query.order("created_at", desc=True).execute()
+        
+        logger.info(f"Found {len(response.data)} resources matching criteria.")
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching resources for user {google_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch resources.")
 
+@app.post('/users/{google_id}/resources', response_model=ResourceInfo, status_code=201)
+async def create_resource(
+    google_id: str, # Keep google_id from path
+    resource_data: ResourceCreate # Remove current_google_id dependency
+):
+    # Use resource_data directly, assuming frontend sends correct user_id
+    # Validate google_id from path matches user_id in body
+    if google_id != resource_data.user_id:
+        raise HTTPException(status_code=400, detail="Path user ID does not match user ID in request body")
 
+    try:
+        logger.info(f"Creating resource for user {google_id} in class {resource_data.class_id}")
+        
+        # Prepare data for insertion
+        insert_dict = resource_data.dict()
+        
+        # *** Convert UUID to string before insertion ***
+        insert_dict['class_id'] = str(insert_dict['class_id'])
+        
+        logger.debug(f"Data for insertion (UUID as string): {insert_dict}") # Log the data being inserted
+
+        # Perform the insert
+        response = supabase.table("resources").insert(insert_dict).execute()
+        
+        if not response.data:
+             raise HTTPException(status_code=500, detail="Failed to create resource entry in database.")
+
+        return response.data[0]
+        
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise specific HTTP exceptions
+    except Exception as e:
+        logger.error(f"Error creating resource for user {google_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create resource.")
 
 
 

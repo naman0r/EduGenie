@@ -10,6 +10,7 @@ import {
   IconSettings, // Settings
   IconUserCircle, // Profile
   IconLogout, // Logout
+  IconBrandBitbucket,
 } from "@tabler/icons-react";
 import { motion } from "motion/react"; // For potential logo animation if reused
 import { cn } from "@/lib/utils";
@@ -65,6 +66,13 @@ export default function UserLayout({
       href: "/classes",
       icon: (
         <IconBook className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+      ),
+    },
+    {
+      label: "All Resources",
+      href: "/resources",
+      icon: (
+        <IconBrandBitbucket className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
     },
     {
