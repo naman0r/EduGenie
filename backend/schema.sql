@@ -43,3 +43,32 @@ COMMENT ON COLUMN classes.user_id IS 'Foreign key referencing the google_id in t
 COMMENT ON COLUMN classes.name IS 'The display name of the course.';
 COMMENT ON COLUMN classes.code IS 'Optional course code (e.g., MATH201).';
 COMMENT ON COLUMN classes.instructor IS 'Optional name of the course instructor.';
+
+
+
+
+
+-- RESOURCES TABLE: 
+
+-- Table to store user-generated resources linked to classes
+CREATE TABLE resources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique ID for the resource
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE, -- Link to the class
+    user_id VARCHAR NOT NULL REFERENCES users(google_id) ON DELETE CASCADE, -- Link to the user who created it
+    type TEXT NOT NULL CHECK (type IN ('flashcards', 'Mindmap', 'Text notes')), -- Type of resource
+    name TEXT NOT NULL, -- User-defined name for the resource
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()), -- When the resource was created
+    -- updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()), -- No updated_at in schema style, add if needed
+    content JSONB -- Content of the resource (structure depends on type)
+);
+
+-- Optional: Indexes for faster lookups
+CREATE INDEX idx_resources_class_id ON resources(class_id);
+CREATE INDEX idx_resources_user_id ON resources(user_id);
+
+-- Optional: Comments for clarity
+COMMENT ON TABLE resources IS 'Stores user-generated resources like notes, mind maps, and flashcards linked to classes.';
+COMMENT ON COLUMN resources.class_id IS 'Foreign key referencing the id in the classes table.';
+COMMENT ON COLUMN resources.user_id IS 'Foreign key referencing the google_id in the users table.';
+COMMENT ON COLUMN resources.type IS 'Type of the resource (flashcards, Mindmap, Text notes).';
+COMMENT ON COLUMN resources.content IS 'JSONB content of the resource, structure depends on the type.';

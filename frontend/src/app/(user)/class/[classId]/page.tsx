@@ -70,6 +70,45 @@ export default function ClassDetailsPage() {
   const [classDetails, setClassDetails] = useState<ClassData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Syllabus upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<
+    "idle" | "uploading" | "success" | "error"
+  >("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  // Resource creation UI state
+  const [showResourceOptions, setShowResourceOptions] =
+    useState<boolean>(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) setSelectedFile(e.target.files[0]);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      setUploadError("Please select a file to upload.");
+      return;
+    }
+    setUploadStatus("uploading");
+    setUploadError(null);
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    try {
+      const res = await fetch(
+        `http://localhost:8000/classes/${classId}/syllabus`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+      if (!res.ok) throw new Error(`Upload failed with status ${res.status}`);
+      setUploadStatus("success");
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      setUploadStatus("error");
+      setUploadError(err.message);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -180,77 +219,119 @@ export default function ClassDetailsPage() {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="bg-gray-800/30 p-6 rounded-lg shadow-xl min-h-[400px]">
+      {/* Syllabus Upload Section */}
+      <div className="bg-gray-800/30 p-6 rounded-lg shadow-xl mb-6">
         <h2 className="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">
-          Upcoming Tasks & Assignments
+          Upload Syllabus
         </h2>
+        <input
+          type="file"
+          accept=".pdf,.docx"
+          onChange={handleFileChange}
+          className="mb-2 text-gray-100"
+        />
+        <button
+          onClick={handleUpload}
+          disabled={!selectedFile || uploadStatus === "uploading"}
+          className="ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {uploadStatus === "uploading" ? "Uploading..." : "Upload"}
+        </button>
+        {uploadStatus === "success" && (
+          <p className="text-green-400 mt-2">Upload successful!</p>
+        )}
+        {uploadStatus === "error" && uploadError && (
+          <p className="text-red-500 mt-2">Error: {uploadError}</p>
+        )}
+      </div>
 
-        {/* Task List */}
-        <div className="space-y-4">
-          {mockTasks.length === 0 ? (
-            <p className="text-gray-400 italic">
-              No tasks added for this class yet.
-            </p>
-          ) : (
-            mockTasks.map((task) => (
-              <div
-                key={task.id}
-                className="bg-gray-700/50 p-4 rounded-md border border-gray-600 hover:bg-gray-700/70 transition duration-150"
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-lg font-medium text-gray-100">
-                    {task.title}
-                  </h3>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      task.status === "completed"
-                        ? "bg-green-500/20 text-green-300"
-                        : task.status === "in-progress"
-                        ? "bg-yellow-500/20 text-yellow-300"
-                        : "bg-gray-500/20 text-gray-300"
-                    }`}
-                  >
-                    {task.status}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-1 text-sm text-gray-400">
-                  <div>
-                    Assigned:{" "}
-                    <span className="text-gray-300">{task.assigned_date}</span>
-                  </div>
-                  <div>
-                    Deadline:{" "}
-                    <span className="text-red-400 font-medium">
-                      {task.deadline}
-                    </span>
-                  </div>
-                  <div>
-                    Personal Goal:{" "}
-                    <span className="text-blue-400">
-                      {task.personal_completion_deadline}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))
+      {/* Content Columns: Resources & Tasks */}
+      <div className="lg:flex lg:space-x-6">
+        {/* Left Panel: Resource Creation */}
+        <div className="bg-gray-800/30 p-6 rounded-lg shadow-xl mb-6 lg:mb-0 w-full lg:w-1/3">
+          <h2 className="text-xl font-semibold mb-4">Resources</h2>
+          <button
+            onClick={() => setShowResourceOptions(!showResourceOptions)}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Create New Resource
+          </button>
+          {showResourceOptions && (
+            <div className="mt-4 space-y-2">
+              <button className="w-full text-left px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+                Basic Note Set
+              </button>
+              <button className="w-full text-left px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+                Mindmap
+              </button>
+              <button className="w-full text-left px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">
+                Flashcards
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Placeholder for future content */}
-        {/* <h2 className="text-xl font-semibold mt-8 mb-4 border-b border-gray-600 pb-2">
-          Other Class Content
-        </h2>
-        <p className="text-gray-400">
-          [Future content for this class will go here - e.g., syllabus upload
-          section, generated study plans, notes integration, etc.]
-        </p> */}
-
-        {/* Display Class ID for reference */}
-        <p className="text-xs text-gray-600 mt-10">
-          Class ID: {classDetails.id}
-        </p>
+        {/* Right Panel: Task List */}
+        <div className="bg-gray-800/30 p-6 rounded-lg shadow-xl w-full lg:w-2/3">
+          <h2 className="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">
+            Upcoming Tasks & Assignments
+          </h2>
+          <div className="space-y-4">
+            {mockTasks.length === 0 ? (
+              <p className="text-gray-400 italic">
+                No tasks added for this class yet.
+              </p>
+            ) : (
+              mockTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="bg-gray-700/50 p-4 rounded-md border border-gray-600 hover:bg-gray-700/70 transition duration-150"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-medium text-gray-100">
+                      {task.title}
+                    </h3>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        task.status === "completed"
+                          ? "bg-green-500/20 text-green-300"
+                          : task.status === "in-progress"
+                          ? "bg-yellow-500/20 text-yellow-300"
+                          : "bg-gray-500/20 text-gray-300"
+                      }`}
+                    >
+                      {task.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-1 text-sm text-gray-400">
+                    <div>
+                      Assigned:{" "}
+                      <span className="text-gray-300">
+                        {task.assigned_date}
+                      </span>
+                    </div>
+                    <div>
+                      Deadline:{" "}
+                      <span className="text-red-400 font-medium">
+                        {task.deadline}
+                      </span>
+                    </div>
+                    <div>
+                      Personal Goal:{" "}
+                      <span className="text-blue-400">
+                        {task.personal_completion_deadline}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Display Class ID for reference */}
+      <p className="text-xs text-gray-600 mt-10">Class ID: {classDetails.id}</p>
     </div>
   );
 }

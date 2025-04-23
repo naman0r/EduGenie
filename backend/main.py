@@ -482,6 +482,21 @@ async def add_calendar_event(google_id: str, event_data: CalendarEventCreate):
         logger.error(f"Unexpected error creating calendar event for user {google_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create calendar event due to an internal server error.")
 
+
+
+
+# --- Study Resources Endpoints ---
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting server...")

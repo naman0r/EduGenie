@@ -45,6 +45,15 @@ function NavBar({ className }: { className?: string }) {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        // Store google_id when user logs in or is already logged in
+        localStorage.setItem("google_id", currentUser.uid);
+        console.log("Stored google_id in localStorage:", currentUser.uid); // Optional: for debugging
+      } else {
+        // Remove google_id when user logs out
+        localStorage.removeItem("google_id");
+        console.log("Removed google_id from localStorage"); // Optional: for debugging
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -54,12 +63,21 @@ function NavBar({ className }: { className?: string }) {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       setUser(result.user);
-      syncUserWithBackend(result.user).catch((err) => {
-        console.error("Background sync failed:", err);
-        setError(
-          "Failed to sync account data. Some features might be limited."
-        );
-      });
+      // Store google_id immediately after successful login
+      if (result.user) {
+        localStorage.setItem("google_id", result.user.uid);
+        console.log(
+          "Stored google_id in localStorage from handleLogin:",
+          result.user.uid
+        ); // Optional: for debugging
+        // Sync with backend (can happen after storing locally)
+        syncUserWithBackend(result.user).catch((err) => {
+          console.error("Background sync failed:", err);
+          setError(
+            "Failed to sync account data. Some features might be limited."
+          );
+        });
+      }
     } catch (error: any) {
       console.error("Login Error:", error);
       setError("Failed to login. Please try again.");

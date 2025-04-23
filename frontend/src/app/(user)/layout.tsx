@@ -54,11 +54,6 @@ export default function UserLayout({
   // Define navigation links for the sidebar
   const links = [
     {
-      label: "Home",
-      href: "/",
-      icon: <Logo />,
-    },
-    {
       label: "Dashboard",
       href: "/dashboard",
       icon: (
@@ -130,7 +125,7 @@ export default function UserLayout({
           {/* Top Section: Logo & Links */}
           <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <div className="px-3 py-2">
-              {/* Add some padding for the logo */}
+              <Logo />
             </div>
             <div className="mt-8 flex flex-col gap-2">
               {links.map((link, idx) => (
