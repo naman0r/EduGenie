@@ -41,3 +41,19 @@ Okay, so I needed my backend to actually do something with the Google Calendar c
   - Call Google API: It uses the service client to insert the event: calendar_service.events().insert(calendarId='primary', body=event_body).execute(). calendarId='primary' means "add it to the user's main calendar". .execute() actually sends the request to Google.
   - Call Google API: It uses the service client to insert the event: calendar_service.events().insert(calendarId='primary', body=event_body).execute(). calendarId='primary' means "add it to the user's main calendar". .execute() actually sends the request to Google.
   - Error Handling: It specifically catches HttpError from the Google client library to handle API-specific errors (like permission denied - 403, or bad request data - 400) and also catches the exceptions raised by my get_google_calendar_client helper, returning appropriate error responses to the frontend
+
+## Resources, abstracting, and progress:
+
+```typescript
+interface Resource {
+  id: string;
+  class_id: string;
+  user_id: string;
+  type: string;
+  name: string;
+  created_at: string;
+  content?: Record<string, any>;
+}
+```
+
+/users/{google_id}/resources/{resource_id}
