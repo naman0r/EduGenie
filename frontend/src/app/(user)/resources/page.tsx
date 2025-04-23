@@ -82,11 +82,8 @@ const Resources = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {resources.length > 0 ? (
             resources.map((resource) => (
-              <Link href={`/resources/${resource.id}`}>
-                <div
-                  key={resource.id}
-                  className="bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow duration-200 ease-in-out"
-                >
+              <Link href={`/resources/${resource.id}`} key={resource.id}>
+                <div className="bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow duration-200 ease-in-out">
                   <h2
                     className="text-xl font-semibold text-white mb-2 truncate"
                     title={resource.name}
@@ -99,8 +96,6 @@ const Resources = () => {
                       {resource.type}
                     </span>
                   </p>
-                  {/* Add more details or actions here if needed */}
-                  {/* Example: <p className="text-xs text-gray-500">Created: {new Date(resource.created_at).toLocaleDateString()}</p> */}
                 </div>
               </Link>
             ))
