@@ -16,7 +16,6 @@ interface Resource {
 const ResourceView = () => {
   const params = useParams();
   const resourceId = params?.id as string | undefined;
-  const googleId = localStorage.getItem("google_id");
   const [resource, setResource] = useState<Resource | null>(null);
 
   if (!resourceId) {
@@ -24,17 +23,28 @@ const ResourceView = () => {
   }
 
   useEffect(() => {
+    const googleId = localStorage.getItem("google_id");
+
+    if (!googleId) {
+      console.error("Google ID not found in localStorage.");
+      return;
+    }
+
     const fetchResource = async () => {
       try {
         const response = await fetch(
           `http://localhost:8000/users/${googleId}/resources/${resourceId}`
         );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
         setResource(data);
       } catch (error) {
         console.error("Error fetching resource:", error);
       }
     };
+
     fetchResource();
   }, [resourceId]);
 
