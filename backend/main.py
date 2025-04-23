@@ -578,10 +578,33 @@ async def create_resource(
 
 
 
+@app.get('/users/{google_id}/resources/all', response_model=list[ResourceInfo])
+async def get_all_resources(
+    google_id: str,
+    class_id: Optional[UUID] = Query(None) # Remove current_google_id dependency
+):
+    try:
+        logger.info(f"Fetching resources for user {google_id}" + (f" in class {class_id}" if class_id else ""))
+        query = supabase.table("resources").select("*" ).eq("user_id", google_id)
+        
+       
+        response = query.order("created_at", desc=True).execute()
+        
+        logger.info(f"Found {len(response.data)} resources matching criteria.")
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching resources for user {google_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch resources.")
 
 
-
-
+@app.get('/users/{google_id}/resources/{resource_id}', response_model=ResourceInfo)
+async def get_resource(google_id: str, resource_id: UUID):
+    try:
+        response = supabase.table("resources").select("*").eq("id", str(resource_id)).eq("user_id", google_id).maybe_single().execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching resource {resource_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch resource.")
 
 
 if __name__ == "__main__":
