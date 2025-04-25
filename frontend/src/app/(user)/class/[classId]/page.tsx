@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/utils/firebase"; // For auth check
 import { User } from "firebase/auth";
+import Link from "next/link";
 
 // Reuse ClassData interface from dashboard or redefine if needed
 interface ClassData {
@@ -440,17 +441,18 @@ export default function ClassDetailsPage() {
                 <p className="text-gray-400">No resources created yet.</p>
               )}
               {resources.map((resource) => (
-                <li
+                <Link
+                  href={`http://localhost:3000/resources/${resource.id}`}
                   key={resource.id}
                   className="p-3 bg-gray-700/50 rounded hover:bg-gray-600/50 transition duration-150 cursor-pointer"
                   // TODO: Make this navigate to the resource editor page
-                  onClick={() =>
-                    alert(`Navigate to resource: ${resource.name}`)
-                  }
+                  // onClick={() =>
+                  //   alert(`Navigate to resource: ${resource.name}`)
+                  // }
                 >
                   {resource.name} ({resource.type})
                   {/* Add more details like created date if needed */}
-                </li>
+                </Link>
               ))}
             </ul>
           )}

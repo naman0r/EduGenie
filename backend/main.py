@@ -96,8 +96,11 @@ class ResourceCreate(BaseModel):
 # Pydantic model for resource response
 class ResourceInfo(BaseModel):
     id: UUID
-    class_id: UUID
     user_id: str
+    class_id: UUID
+    class_name: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
     type: str
     name: str
     created_at: datetime
@@ -600,8 +603,32 @@ async def get_all_resources(
 @app.get('/users/{google_id}/resources/{resource_id}', response_model=ResourceInfo)
 async def get_resource(google_id: str, resource_id: UUID):
     try:
-        response = supabase.table("resources").select("*").eq("id", str(resource_id)).eq("user_id", google_id).maybe_single().execute()
-        return response.data
+        # Fetch resource and related class name using Supabase join syntax
+        
+        response = supabase.table("resources").select(
+            "*, classes(name)" # Select all resource fields and the name from the related class
+        ).eq(
+            "id", str(resource_id)
+        ).eq(
+            "user_id", google_id
+        ).maybe_single().execute()
+
+        if not response.data:
+             logger.warning(f"Resource {resource_id} not found for user {google_id}")
+             raise HTTPException(status_code=404, detail="Resource not found.")
+
+        # Process data to fit the ResourceInfo model
+        resource_data = response.data
+        if resource_data.get('classes'): # Check if class data was joined
+            resource_data['class_name'] = resource_data['classes'].get('name')
+            del resource_data['classes'] # Remove the nested object after extracting name
+        else:
+            resource_data['class_name'] = None # Ensure class_name is None if class wasn't found
+
+        return resource_data # FastAPI will validate against ResourceInfo
+
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise HTTP exceptions (like 404)
     except Exception as e:
         logger.error(f"Error fetching resource {resource_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch resource.")

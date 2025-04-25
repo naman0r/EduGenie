@@ -160,10 +160,7 @@ export default function UserLayout({
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto">
-        {/* Keep padding on the inner div */}
-        <div className="">
-          {children} {/* Render the active page here */}
-        </div>
+        <div className="mt-15">{children}</div>
       </main>
     </div>
   );

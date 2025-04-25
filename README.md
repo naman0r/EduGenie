@@ -1,5 +1,9 @@
 # EduGenie (or StudyOS) Readme
 
+## top priority:
+
+- make it a PWA.
+
 ### features to be implemented:
 
 - PDF upload for users sylabus; make backend logic for splitting PDF into chunks, storing it into a vector DB, and then process it and return a JSON object of course

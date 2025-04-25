@@ -6,6 +6,7 @@ import { cn } from "@/utils/cn";
 import Link from "next/link";
 import { auth, googleProvider, signInWithPopup } from "@/utils/firebase";
 import { User } from "firebase/auth";
+import { usePathname } from "next/navigation";
 
 const syncUserWithBackend = async (userData: User) => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -41,6 +42,8 @@ function NavBar({ className }: { className?: string }) {
   const [active, setActive] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pathname = usePathname();
+  const showSidebar = pathname === "/" || pathname === "/profile";
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -85,6 +88,7 @@ function NavBar({ className }: { className?: string }) {
   };
 
   return (
+    //{ showSidebar &&
     <div
       className={cn("fixed top-10 inset-x-0 max-w-2xl mx-auto z-50", className)}
     >
