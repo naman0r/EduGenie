@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request as FastAPIRequest
+from fastapi import FastAPI, HTTPException, Request as FastAPIRequest, UploadFile, File, Form # need this for syllabus upload endpoints. 
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
@@ -27,6 +27,7 @@ load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Check if Supabase credentials are set
 if not SUPABASE_URL or not SUPABASE_KEY:
@@ -632,6 +633,29 @@ async def get_resource(google_id: str, resource_id: UUID):
     except Exception as e:
         logger.error(f"Error fetching resource {resource_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch resource.")
+
+
+
+
+
+
+
+
+
+''' RESOURCE AI ENDPOINTS! ---------'''
+
+
+
+
+app.post('/users/{google_id}/resources/{resource_id}/ai/generate-mindmaps')
+def generate_mindmaps(google_id: str, resource_id: UUID):
+    # stub route
+    pass
+
+
+
+
+
 
 
 if __name__ == "__main__":

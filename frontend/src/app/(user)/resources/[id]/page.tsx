@@ -4,17 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ResourceInfo } from "@/types/resources";
 
-interface Resource {
-  id: string;
-  class_id: string;
-  class_name: string;
-  user_id: string;
-  type: string;
-  name: string;
-  created_at: string;
-  content?: Record<string, any>;
-}
-
 const ResourceView = () => {
   const params = useParams();
   const resourceId = params?.id as string | undefined;
