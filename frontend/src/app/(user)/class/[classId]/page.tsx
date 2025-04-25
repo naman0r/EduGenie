@@ -5,39 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/utils/firebase"; // For auth check
 import { User } from "firebase/auth";
 import Link from "next/link";
+import { ResourceInfo } from "@/types/resources";
+import { Task } from "@/types/task";
+import { ClassData } from "@/types/class";
 
-// Reuse ClassData interface from dashboard or redefine if needed
-interface ClassData {
-  id: string;
-  user_id: string;
-  name: string;
-  code?: string | null;
-  instructor?: string | null;
-  created_at: string;
-}
-
-// Define Task interface for mock data
-interface Task {
-  id: string;
-  title: string;
-  assigned_date: string;
-  deadline: string;
-  personal_completion_deadline: string;
-  status: "pending" | "in-progress" | "completed";
-}
-
-// --- Add Resource Interface ---
-interface ResourceInfo {
-  id: string; // UUID
-  class_id: string;
-  user_id: string;
-  type: string;
-  name: string;
-  created_at: string; // ISO datetime string
-  content?: Record<string, any>; // JSONB content
-}
-
-// Mock Task Data
+// Mock Task Data TODO create a task table on supabase.
 const mockTasks: Task[] = [
   {
     id: "task-1",

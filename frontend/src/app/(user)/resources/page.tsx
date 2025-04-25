@@ -1,16 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-
-interface ResourceInfo {
-  id: string; // UUID
-  class_id: string;
-  user_id: string;
-  type: string;
-  name: string;
-  created_at: string; // ISO datetime string
-  content?: Record<string, any>; // JSONB content
-}
+import { ResourceInfo } from "@/types/resources";
 
 const Resources = () => {
   const [resources, setResources] = useState<ResourceInfo[]>([]);

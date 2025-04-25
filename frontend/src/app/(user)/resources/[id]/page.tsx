@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { ResourceInfo } from "@/types/resources";
 
 interface Resource {
   id: string;
   class_id: string;
+  class_name: string;
   user_id: string;
   type: string;
   name: string;
@@ -16,7 +18,7 @@ interface Resource {
 const ResourceView = () => {
   const params = useParams();
   const resourceId = params?.id as string | undefined;
-  const [resource, setResource] = useState<Resource | null>(null);
+  const [resource, setResource] = useState<ResourceInfo | null>(null);
 
   if (!resourceId) {
     return <div>Invalid Resource ID</div>;

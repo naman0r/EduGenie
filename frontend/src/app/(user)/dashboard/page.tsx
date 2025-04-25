@@ -6,16 +6,9 @@ import { auth } from "@/utils/firebase";
 import AddClassForm from "@/components/AddClassForm"; // Import the form component
 import { User } from "firebase/auth"; // Import User type
 import Link from "next/link"; // Import Link
+import { ClassData } from "@/types/class";
 
 // Define the structure of class data (matches backend ClassInfo)
-interface ClassData {
-  id: string;
-  user_id: string;
-  name: string;
-  code?: string | null;
-  instructor?: string | null;
-  created_at: string;
-}
 
 export default function DashboardPage() {
   const router = useRouter();
