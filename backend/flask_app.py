@@ -15,6 +15,9 @@ import json
 import jwt
 from pydantic import BaseModel, Field
 from typing import Optional
+from routes.test import bp as test_bp
+from routes.notes import notes_bp as notes_bp
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +42,8 @@ except Exception as e:
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
-
+app.register_blueprint(test_bp)
+app.register_blueprint(notes_bp)
 # --- Pydantic Models ---
 class UserAuth(BaseModel):
     google_id: str
