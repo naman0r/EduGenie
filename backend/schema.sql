@@ -72,3 +72,11 @@ COMMENT ON COLUMN resources.class_id IS 'Foreign key referencing the id in the c
 COMMENT ON COLUMN resources.user_id IS 'Foreign key referencing the google_id in the users table.';
 COMMENT ON COLUMN resources.type IS 'Type of the resource (flashcards, Mindmap, Text notes).';
 COMMENT ON COLUMN resources.content IS 'JSONB content of the resource, structure depends on the type.';
+
+CREATE TABLE IF NOT EXISTS notes (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
