@@ -55,7 +55,7 @@ def generate_video_route():
     try:
         # === Step 1: Generate Script ===
         logger.info(f"[{job_id}] Generating script...")
-        script_prompt = f"""Based on the following text, create a concise script suitable for a short explanatory video. Break the script down into short, narratable sentences, with each sentence on a new line. Output only the script lines, nothing else.
+        script_prompt = f"""Based on the following text, create a  script suitable for an explanatory video. Break the script down into short, narratable sentences, with each sentence on a new line. Output only the script lines, nothing else.
 
 TEXT:
 {input_text}"""
