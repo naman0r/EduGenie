@@ -160,7 +160,7 @@ export default function UserLayout({
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto">
-        <div className="mt-15">{children}</div>
+        <div className="pt-10">{children}</div>
       </main>
     </div>
   );
