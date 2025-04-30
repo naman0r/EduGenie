@@ -21,6 +21,7 @@ from routes.classes import bp as classes_bp
 from routes.resources import bp as resources_bp
 from routes.calendar import bp as calendar_bp
 from routes.notes import bp as notes_bp
+from routes.video import bp as video_bp
 
 
 
@@ -55,6 +56,7 @@ app.register_blueprint(classes_bp)
 app.register_blueprint(resources_bp)
 app.register_blueprint(calendar_bp)
 app.register_blueprint(notes_bp)
+app.register_blueprint(video_bp)
 
 
 # --- Pydantic Models ---

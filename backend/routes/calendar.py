@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import json
 from initdb import supabase
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
