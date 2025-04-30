@@ -128,12 +128,11 @@ const ResourceDetailPage = () => {
           userId={userId}
         />
       ) : resource.type === "Mindmap" && userId ? (
-        <MindmapDisplay
+        <MindmapDisplay // Use the Wrapper component
           initialNodes={resource.content?.nodes || []}
           initialEdges={resource.content?.edges || []}
           resourceId={resource.id}
-          userId={userId}
-        /> // TODO: @som come up with ideas for flashcards
+        />
       ) : (
         // for now just showing the json content of the flashcard resource (creating a blank content JSONB field, cannot be edited at the moment)
         <div className="mt-4 p-4 border border-gray-700 rounded-lg bg-gray-800/60">

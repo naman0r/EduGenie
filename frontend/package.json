@@ -27,7 +27,8 @@
     "react-dom": "^19.0.0",
     "reactflow": "^11.11.4",
     "simplex-noise": "^4.0.3",
-    "tailwind-merge": "^3.0.2"
+    "tailwind-merge": "^3.0.2",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -35,6 +36,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
     "eslint-config-next": "15.2.2",
     "postcss": "^8.5.3",
