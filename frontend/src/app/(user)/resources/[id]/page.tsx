@@ -133,8 +133,9 @@ const ResourceDetailPage = () => {
           initialEdges={resource.content?.edges || []}
           resourceId={resource.id}
           userId={userId}
-        />
+        /> // TODO: @som come up with ideas for flashcards
       ) : (
+        // for now just showing the json content of the flashcard resource (creating a blank content JSONB field, cannot be edited at the moment)
         <div className="mt-4 p-4 border border-gray-700 rounded-lg bg-gray-800/60">
           <h3 className="text-lg font-semibold mb-2">Resource Content</h3>
           <pre className="text-gray-300 whitespace-pre-wrap break-words">
