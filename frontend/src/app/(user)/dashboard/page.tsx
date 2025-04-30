@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
   // Render Dashboard Content
   return (
-    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16">
+    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16 pt-35">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Your Classes</h1>
         <button

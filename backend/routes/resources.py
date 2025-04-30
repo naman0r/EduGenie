@@ -5,6 +5,10 @@ from datetime import datetime
 import logging
 from uuid import UUID
 from initdb import supabase
+import openai
+import os
+import json
+from openai import OpenAI, APIError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +22,16 @@ class ResourceCreate(BaseModel):
     type: str
     name: str
     content: dict
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Instantiate the client (ensure API key is set)
+client = None
+if OPENAI_API_KEY:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    logger.info("OpenAI client initialized.")
+else:
+    logger.warning("OPENAI_API_KEY not found. OpenAI client not initialized.")
 
 @bp.route('/users/<string:google_id>/resources', methods=['GET'])
 def get_user_resources(google_id):
@@ -45,7 +59,7 @@ def create_resource_route(google_id):
         return jsonify(resp.data[0]), 201
     except Exception as e:
         logger.error(f"Error creating resource: {e}")
-        abort(500, description=str(e))
+        abort(500, description=str(e)) # learned abort instead of return for error handling
 
 @bp.route('/users/<string:google_id>/resources/all', methods=['GET'])
 def get_all_resources(google_id):
@@ -70,7 +84,148 @@ def get_resource_route(google_id, resource_id):
         logger.error(f"Error fetching resource: {e}")
         abort(500, description=str(e))
 
-@bp.route('/users/<string:google_id>/resources/<string:resource_id>/ai/generate-mindmaps', methods=['POST'])
-def generate_mindmaps_route(google_id, resource_id):
-    # stub route
-    return ('', 204) 
+@bp.route('/users/<string:google_id>/resources/<string:resource_id>', methods=['PUT'])
+def update_resource_content(google_id, resource_id):
+    data = request.get_json()
+    if 'content' not in data:
+        abort(400, description="'content' field is required for update.")
+
+    try:
+        # Fetch the resource to ensure it exists and belongs to the user
+        resource_resp = supabase.table("resources").select("id, user_id").eq("id", resource_id).eq("user_id", google_id).maybe_single().execute()
+        if not resource_resp.data:
+            abort(404, description="Resource not found or access denied.")
+
+        update_payload = {"content": data['content']}
+        # Optionally add updated_at if you have it in your schema
+        # update_payload["updated_at"] = datetime.utcnow().isoformat()
+
+        updated = supabase.table("resources").update(update_payload).eq("id", resource_id).execute()
+        
+        # Supabase update doesn't return the full updated object by default in Python client v1 unless specified
+        # Fetch the updated resource again to return it
+        if updated.data: # Check if update was likely successful (affected rows > 0)
+            fetch_updated = supabase.table("resources").select("*, classes(name)").eq("id", resource_id).maybe_single().execute()
+            if fetch_updated.data:
+                 data = fetch_updated.data
+                 cls = data.pop('classes', None)
+                 data['class_name'] = cls.get('name') if cls else None
+                 return jsonify(data)
+            else:
+                 # Should not happen if update was successful, but handle defensively
+                 abort(500, description="Failed to retrieve updated resource.")
+        else:
+            # This condition might indicate the resource wasn't found or wasn't updated
+            abort(404, description="Resource not found or failed to update.")
+
+    except Exception as e:
+        logger.error(f"Error updating resource content: {e}")
+        abort(500, description=str(e))
+
+@bp.route('/users/<string:google_id>/resources/<string:resource_id>/generate-mindmap', methods=['POST'])
+def generate_mindmap_route(google_id, resource_id):
+    if not client:
+        abort(500, description="OpenAI client not initialized due to missing API key.")
+
+    data = request.get_json()
+    prompt = data.get('prompt')
+    if not prompt:
+        abort(400, description="'prompt' field is required.")
+
+    try:
+        # 1. Verify resource exists and belongs to user
+        resource_resp = supabase.table("resources")\
+            .select("id, user_id, type")\
+            .eq("id", resource_id)\
+            .eq("user_id", google_id)\
+            .maybe_single()\
+            .execute()
+
+        if not resource_resp.data:
+            abort(404, description="Resource not found or access denied.")
+        if resource_resp.data.get('type') != 'Mindmap':
+             abort(400, description="Resource is not of type Mindmap.")
+
+        # 2. Call OpenAI API (New Syntax)
+        logger.info(f"Generating mind map for resource {resource_id} with prompt: {prompt[:50]}...")
+        system_prompt = (
+             "You are an expert mind map generator. Given a topic or text, create a hierarchical mind map structure. "
+            "Output ONLY a JSON object containing two keys: 'nodes' and 'edges'. "
+            "'nodes' should be an array of objects, each with 'id' (string), 'position' (object with 'x' and 'y', initially 0), and 'data' (object with 'label'). "
+            "'edges' should be an array of objects, each with 'id' (string, e.g., 'e1-2'), 'source' (source node id), and 'target' (target node id). "
+            "Ensure node IDs are unique strings. Start node IDs from '1'. Edge IDs should follow the format 'e[source]-[target]'."
+            "Example node: { id: '1', position: { x: 0, y: 0 }, data: { label: 'Central Topic' } }"
+            "Example edge: { id: 'e1-2', source: '1', target: '2' }"
+            "Do not include any explanations or introductory text outside the JSON object."
+        )
+
+        completion = client.chat.completions.create(
+            model="gpt-3.5-turbo-1106",
+            response_format={ "type": "json_object" },
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5,
+            max_tokens=2048
+        )
+
+        mindmap_json_string = completion.choices[0].message.content
+        logger.info("OpenAI response received.")
+
+        # 3. Parse and Validate OpenAI response
+        try:
+            mindmap_data = json.loads(mindmap_json_string)
+            if not isinstance(mindmap_data, dict) or 'nodes' not in mindmap_data or 'edges' not in mindmap_data:
+                raise ValueError("Invalid JSON structure from OpenAI.")
+            # Add more validation if needed (e.g., check node/edge formats)
+        except (json.JSONDecodeError, ValueError) as json_error:
+            logger.error(f"Failed to parse OpenAI response as valid JSON: {json_error}")
+            logger.error(f"Raw OpenAI response: {mindmap_json_string}")
+            abort(500, description="Failed to process the generated mind map structure.")
+
+        # 4. Update the resource content in Supabase
+        update_payload = {"content": mindmap_data}
+        # Optionally add updated_at
+        # update_payload["updated_at"] = datetime.utcnow().isoformat()
+
+        updated = supabase.table("resources")\
+            .update(update_payload)\
+            .eq("id", resource_id)\
+            .execute()
+
+        if not updated.data:
+             # This usually means the row wasn't found, which shouldn't happen after the initial check
+             abort(500, description="Failed to update resource content after generation.")
+
+        # 5. Fetch and return the updated resource (or just the content)
+        # Fetch the updated resource again to return it
+        fetch_updated = supabase.table("resources")\
+            .select("*, classes(name)")\
+            .eq("id", resource_id)\
+            .maybe_single()\
+            .execute()
+            
+        if fetch_updated.data:
+             res_data = fetch_updated.data
+             cls = res_data.pop('classes', None)
+             res_data['class_name'] = cls.get('name') if cls else None
+             return jsonify(res_data)
+        else:
+             abort(500, description="Failed to retrieve updated resource after update.")
+
+    except APIError as openai_error: # Use new error type
+        logger.error(f"OpenAI API error: {openai_error}")
+        abort(502, description=f"AI service error: {openai_error.message}") # Access message attribute
+    except Exception as e:
+        logger.error(f"Error generating mind map: {e}")
+        # Include traceback for detailed debugging
+        import traceback
+        logger.error(traceback.format_exc())
+        abort(500, description="An unexpected error occurred while generating the mind map.")
+
+# Keep the generate-mindmaps stub or remove if replaced by the one above
+# @bp.route('/users/<string:google_id>/resources/<string:resource_id>/ai/generate-mindmaps', methods=['POST'])
+# def generate_mindmaps_route(google_id, resource_id):
+#     # stub route
+#     return ('', 204) 

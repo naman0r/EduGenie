@@ -4,7 +4,7 @@ export interface ResourceInfo {
   user_id: string;
   type: string;
   name: string;
-  class_name: string; // adjusted the backend rote to match the interface.
+  class_name?: string; // Make optional to allow null/undefined from fetch
   created_at: string; // ISO datetime string
   content?: Record<string, any>; // JSONB content
 }

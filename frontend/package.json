@@ -13,7 +13,9 @@
     "@tsparticles/engine": "^3.8.1",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.8.1",
+    "@types/dagre": "^0.7.52",
     "clsx": "^2.1.1",
+    "dagre": "^0.8.5",
     "firebase": "^11.4.0",
     "lucide-react": "^0.482.0",
     "motion": "^12.5.0",
@@ -23,6 +25,7 @@
     "quill": "^2.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "reactflow": "^11.11.4",
     "simplex-noise": "^4.0.3",
     "tailwind-merge": "^3.0.2"
   },

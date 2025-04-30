@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ResourceInfo } from "@/types/resources";
+import NotesComponent from "@/components/NotesComponent";
 
 const Resources = () => {
   const [resources, setResources] = useState<ResourceInfo[]>([]);

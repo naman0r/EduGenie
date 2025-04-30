@@ -23,6 +23,7 @@ from routes.calendar import bp as calendar_bp
 from routes.notes import bp as notes_bp
 
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ except Exception as e:
     raise
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+CORS(app, origins=["http://localhost:3000"], supports_credentials=True, allow_headers=["Content-Type"])
 
 # Register blueprints
 app.register_blueprint(auth_bp)
@@ -54,6 +55,7 @@ app.register_blueprint(classes_bp)
 app.register_blueprint(resources_bp)
 app.register_blueprint(calendar_bp)
 app.register_blueprint(notes_bp)
+
 
 # --- Pydantic Models ---
 class UserAuth(BaseModel):
