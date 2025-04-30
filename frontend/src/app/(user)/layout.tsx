@@ -62,8 +62,8 @@ export default function UserLayout({
       ),
     },
     {
-      label: "Classes",
-      href: "/classes",
+      label: "Chat",
+      href: "/chat",
       icon: (
         <IconBook className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
