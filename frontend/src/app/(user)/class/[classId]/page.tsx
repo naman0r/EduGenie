@@ -413,18 +413,22 @@ export default function ClassDetailsPage() {
                 <p className="text-gray-400">No resources created yet.</p>
               )}
               {resources.map((resource) => (
-                <Link
-                  href={`http://localhost:3000/resources/${resource.id}`}
-                  key={resource.id}
-                  className="p-3 bg-gray-700/50 rounded hover:bg-gray-600/50 transition duration-150 cursor-pointer"
-                  // TODO: Make this navigate to the resource editor page
-                  // onClick={() =>
-                  //   alert(`Navigate to resource: ${resource.name}`)
-                  // }
-                >
-                  {resource.name} ({resource.type})
-                  {/* Add more details like created date if needed */}
-                </Link>
+                <li key={resource.id}>
+                  <Link
+                    href={`/resources/${resource.id}`}
+                    className="block p-3 bg-gray-700/50 rounded hover:bg-gray-600/50 transition duration-150"
+                  >
+                    <span
+                      className="font-medium text-gray-100 block truncate"
+                      title={resource.name}
+                    >
+                      {resource.name}
+                    </span>
+                    <span className="text-xs text-indigo-300 capitalize">
+                      {resource.type}
+                    </span>
+                  </Link>
+                </li>
               ))}
             </ul>
           )}

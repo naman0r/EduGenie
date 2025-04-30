@@ -47,7 +47,8 @@ except Exception as e:
     raise
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True, allow_headers=["Content-Type"])
+# Allow requests from the frontend origin, support credentials, and allow Content-Type and Authorization headers
+CORS(app, origins=["http://localhost:3000"], supports_credentials=True, allow_headers=["Content-Type", "Authorization"])
 
 # Register blueprints
 app.register_blueprint(auth_bp)
