@@ -38,7 +38,7 @@ const ChatPage = () => {
     setVideoUrl(null);
     try {
       const response = await fetch(
-        "http://localhost:8000/chat/generate-video",
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/chat/generate-video`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -53,7 +53,7 @@ const ChatPage = () => {
       }
       if (data.video_url) {
         const fullUrl = data.video_url.startsWith("/")
-          ? `http://localhost:8000${data.video_url}`
+          ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${data.video_url}`
           : data.video_url;
         setVideoUrl(fullUrl);
         // Optionally clear video input: setVideoInputText("");
@@ -81,7 +81,6 @@ const ChatPage = () => {
     setMessages((prev) => [...prev, newUserMessage]);
     setChatInput("");
 
-    // --- Placeholder for AI Response ---
     setIsChatLoading(true);
     setTimeout(() => {
       // Simulate AI thinking
@@ -96,7 +95,6 @@ const ChatPage = () => {
       setMessages((prev) => [...prev, aiResponse]);
       setIsChatLoading(false);
     }, 1500);
-    // --- End Placeholder ---
   };
 
   return (

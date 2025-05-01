@@ -64,7 +64,7 @@ export default function ProfilePage() {
           // Use google_id (currentUser.uid from Firebase often matches google_id)
           const googleId = currentUser.uid;
           const response = await fetch(
-            `http://localhost:8000/users/${googleId}`
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${googleId}`
           ); // Use google_id in URL
 
           if (!response.ok) {
@@ -165,14 +165,17 @@ export default function ProfilePage() {
 
     try {
       const googleId = user.uid;
-      const response = await fetch(`http://localhost:8000/users/${googleId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          // No Authorization header needed for now
-        },
-        body: JSON.stringify(formData), // Send only updated fields
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${googleId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            // No Authorization header needed for now
+          },
+          body: JSON.stringify(formData), // Send only updated fields
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -214,7 +217,7 @@ export default function ProfilePage() {
   const connectGoogleCalendar = () => {
     if (user && user.uid) {
       // Redirect to the backend initiation endpoint
-      window.location.href = `http://localhost:8000/auth/google/calendar/initiate?google_id=${user.uid}`;
+      window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google/calendar/initiate?google_id=${user.uid}`;
     } else {
       setError("You must be logged in to connect Google Calendar.");
     }
@@ -252,7 +255,7 @@ export default function ProfilePage() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/users/${user.uid}/calendar/events`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${user.uid}/calendar/events`,
         {
           method: "POST",
           headers: {

@@ -27,7 +27,7 @@ export default function DashboardPage() {
         try {
           const googleId = currentUser.uid;
           const response = await fetch(
-            `http://localhost:8000/users/${googleId}/classes`
+            `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${googleId}/classes`
           );
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);

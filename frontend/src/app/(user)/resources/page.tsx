@@ -27,7 +27,7 @@ const Resources = () => {
       }
 
       try {
-        const apiUrl = `http://localhost:8000/users/${googleId}/resources/all`;
+        const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${googleId}/resources/all`;
         const response = await fetch(apiUrl);
 
         if (!response.ok) {

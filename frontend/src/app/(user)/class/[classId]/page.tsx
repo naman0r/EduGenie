@@ -91,7 +91,7 @@ export default function ClassDetailsPage() {
     formData.append("file", selectedFile);
     try {
       const res = await fetch(
-        `http://localhost:8000/classes/${classId}/syllabus`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/syllabus`,
         {
           method: "POST",
           body: formData,
@@ -115,7 +115,7 @@ export default function ClassDetailsPage() {
           try {
             setIsLoading(true); // Set loading true before fetch
             const response = await fetch(
-              `http://localhost:8000/classes/${classId}`
+              `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}`
             );
 
             if (!response.ok) {
@@ -172,10 +172,8 @@ export default function ClassDetailsPage() {
         throw new Error("Authentication token not available.");
       }
 
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const response = await fetch(
-        `${API_URL}/users/${user.uid}/resources?class_id=${classId}`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${user.uid}/resources?class_id=${classId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -225,28 +223,23 @@ export default function ClassDetailsPage() {
     setResourcesError(null);
 
     try {
-      const token = await auth.currentUser?.getIdToken();
-      // No token needed if backend auth is removed, but keep for potential future use
-      // if (!token) {
-      //   throw new Error("Authentication token not available.");
-      // }
-
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${API_URL}/users/${user.uid}/resources`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Authorization: `Bearer ${token}`, // Keep commented out for now
-        },
-        body: JSON.stringify({
-          class_id: classId,
-          user_id: user.uid,
-          type: selectedType, // Use state variable
-          name: newResourceName, // Use state variable
-          content: {},
-        }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${user.uid}/resources`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Authorization: `Bearer ${token}`, // Keep commented out for now
+          },
+          body: JSON.stringify({
+            class_id: classId,
+            user_id: user.uid,
+            type: selectedType, // Use state variable
+            name: newResourceName, // Use state variable
+            content: {},
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -270,7 +263,6 @@ export default function ClassDetailsPage() {
     // No finally block needed here, step state handles loading/idle transition
   };
 
-  // --- Handler to open modal and reset state ---
   const handleOpenCreateModal = () => {
     setShowCreateResourceModal(true);
     setResourceCreationStep("selectType");
@@ -279,7 +271,6 @@ export default function ClassDetailsPage() {
     setResourcesError(null); // Clear previous errors
   };
 
-  // --- Handler for selecting type ---
   const handleSelectType = (type: string) => {
     setSelectedType(type);
     // Set default name based on type
@@ -291,18 +282,18 @@ export default function ClassDetailsPage() {
     setResourceCreationStep("enterName");
   };
 
-  // --- Handler to go back to type selection ---
+  //  Handler to go back to type selection
   const handleGoBackToTypeSelection = () => {
     setResourceCreationStep("selectType");
     setResourcesError(null); // Clear errors when going back
   };
 
-  // --- Handler to cancel/close modal ---
+  //  Handler to cancel/close modal
   const handleCancelCreation = () => {
     setShowCreateResourceModal(false);
   };
 
-  // --- Combined Loading State ---
+  //  Combined Loading State
   // Show loading if class details are loading OR resources are loading
   if (isLoading || resourcesLoading) {
     return (
@@ -313,7 +304,7 @@ export default function ClassDetailsPage() {
     );
   }
 
-  // --- Error State (Prioritize class details error) ---
+  //  Error State (Prioritize class details error)
   if (error) {
     return (
       <div className="min-h-screen bg-black/[0.96] text-red-500 flex flex-col justify-center items-center p-8">
@@ -328,7 +319,7 @@ export default function ClassDetailsPage() {
     );
   }
 
-  // --- Render Class Details (only if classDetails are available) ---
+  //  Render Class Details (only if classDetails are available)
   if (!classDetails) {
     // This case might occur briefly or if there was an issue not caught by error state
     return (

@@ -44,7 +44,7 @@ const ResourceDetailPage = () => {
       setError(null);
       try {
         const response = await fetch(
-          `http://localhost:8000/users/${userId}/resources/${resourceId}`
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${userId}/resources/${resourceId}`
         );
 
         if (!response.ok) {
