@@ -11,6 +11,7 @@ import {
   IconUserCircle, // Profile
   IconLogout, // Logout
   IconBrandBitbucket,
+  IconBubbleText,
 } from "@tabler/icons-react";
 import { motion } from "motion/react"; // For potential logo animation if reused
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ import logoIcon from "@/app/icon.png"; // <-- Import the image file
 const Logo = () => {
   return (
     <Link
-      href="/dashboard" // Link logo to dashboard or appropriate home for logged-in users
+      href="/" // Link logo to dashboard or appropriate home for logged-in users
       className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-black dark:text-white"
     >
       <Image
@@ -65,7 +66,7 @@ export default function UserLayout({
       label: "Chat",
       href: "/chat",
       icon: (
-        <IconBook className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+        <IconBubbleText className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
     },
     {

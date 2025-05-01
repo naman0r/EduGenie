@@ -1,12 +1,18 @@
 # Assignment tracking for EduGenie
 
-[ ] - @Som: go to frontend/app/(user)/resources/[id]/page.tsx - implement functionality for user to be able to create and view flashcards based on a text input box where the user can input CSV values for question, answer; and user should be able to UPDATE the resource, and then implement an 'ask ai' button, which is a simple chat api call which includes the current csv text content notes (stored as JSONB) and gives it to chat, asks to generate MORE flashcards in the same JSONB format inputted and then displays it on the frontend
+- [ ] : @som: once you complete onboarding to make sur eyou understand the whole application structure now, go to backend/routes.md and make sure you understand how everything works.
 
-[ ] - @som and @naman: how can rate limiting be implemented in this? we want the user to only be able to generate around 5 videos on freemium (basic plan) and only have like 2 resources per class, and only be able to use the ai note taking capabilities per note like twice.
+- [ ] - @Som: go to frontend/app/(user)/resources/[id]/page.tsx - implement functionality for user to be able to create and view flashcards based on a text input box where the user can input CSV values for question, answer; and user should be able to UPDATE the resource, and then implement an 'ask ai' button, which is a simple chat api call which includes the current csv text content notes (stored as JSONB) and gives it to chat, asks to generate MORE flashcards in the same JSONB format inputted and then displays it on the frontend
 
-[ ] - @som and @naman: think about best deployment practices while writing code. replace all backend api calls with **process.env.NEXT_BACKEND_URL**, which's value will be stored as http://localhost:8000 for now, but will be changed to something like api.edugenie.com when we do deploy the backend with railway and deploy the frontend with vercel.
+- [ ] - @som and @naman: how can rate limiting be implemented in this? we want the user to only be able to generate around 5 videos on freemium (basic plan) and only have like 2 resources per class, and only be able to use the ai note taking capabilities per note like twice.
 
-[ ] - @som : how can we deploy with the ai video generated shit??????? docker? or do we need to find a new way for this ai generation strategy? pls investigate, bc we are looking at an around 2 weeks from now deployment timeline.
+- [ ] - @som and @naman: think about best deployment practices while writing code. replace all backend api calls with **process.env.NEXT_BACKEND_URL**, which's value will be stored as http://localhost:8000 for now, but will be changed to something like api.edugenie.com when we do deploy the backend with railway and deploy the frontend with vercel.
+
+- [ ] - @som : how can we deploy with the ai video generated shit??????? docker? or do we need to find a new way for this ai generation strategy? pls investigate, bc we are looking at an around 2 weeks from now deployment timeline.
+
+- [ ] @both: think about brainding and brand colors. Come up with a new name (EduGenie is not a great name), and come up with a consistent color theme. can migrate to a light mode theme if that is better from a branding and deployment perspective.
+
+- [ ] both: Need to implement backend and frontend logic for all pages in the sidebar (settings, assignments, calendar to be specific), can also add new pages (need to brainstorm which would be the best)
 
 ## **IDEA**:
 
@@ -16,4 +22,34 @@
   - users can GET more points by either purchasing first tier premium ($5 a month), or referring friends (20 credits for each friend they refer successfully).
   - i think we can do this with clever routing parameters (eg: edugenie.vercel.app/profile?uid=**\_\_\_\_**), and when user creates account, a certain number of points is added to
 
-[X] COMPLETED - @Naman: implement a way where users can add more nodes in the mindmap, look through react flow documentation, the generate wiht ai button should be adding to current mindmap not creating a new one every time (can implement a upload new button)
+### completed task log and what has been done so far:
+
+[x] COMPLETED - @Naman: implement a way where users can add more nodes in the mindmap, look through react flow documentation, the generate wiht ai button should be adding to current mindmap not creating a new one every time (can implement a upload new button)
+
+[x] Supabase integration, schema built out (can always add more to it), schema can be found in backend/schema.sql
+[x] frontend work: landing page, profile, dashboard, resources, chat, resources/resourdeId, classes/classid, about, pricing,
+
+[x] Backend work: routes set up for video generation (not mvp level), mindmaps (not mvp level), text notes (not mvp level, we need to bring a notion-like feel to this type of resource creation), calendar setup, calendar integration (not even touched), flashcard logic and integration (not even touched), auth with google firebase, calendar auth with google cloud.
+
+# ai strategy:
+
+### Core functionality part 1:
+
+frontend: Accepts either a syllabus PDF upload or raw text
+backend: Extracts plain text from the pdf, this step can be skipped for raw test inputs.
+backend: API call to ChatGPT (or any other cheap AI LLM) to return a JSON object of calendar events (need to define pydantic class and typescript interface)
+backend: sends those calendar events to the google calendar and are marked as 'maybe'
+frontend: displays a list of calendar events
+
+**_problems_**:
+
+- [ ] how will we make sure that the user is free when the google calendar scedules classes, tests, studdy sessions to complete homeworks or prepare for tests?
+- [ ] look into further google calendar integration @som
+
+### video generation problems with deployment:
+
+- [ ] Video generation takes too long for a standard web request (which usally times out after 30-60 seconds)
+- this will lead to flask server timeouts.
+- one deployment strategy is to use docker and then deploy it using ECS, another strategy is to use celery and redis (need to research further) which provides async support to our routes (should have stuck with fastapi smh)
+- ok so basically celery is a 'distributed task queue', which lets our backend logic work outside the request/response cycle, either async or on a scedule. \* note used to send emails in venu
+- really only the video generation stuff might be giving us issues with deployment at the moment.

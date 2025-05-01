@@ -87,8 +87,8 @@ def get_resource_route(google_id, resource_id):
 @bp.route('/users/<string:google_id>/resources/<string:resource_id>', methods=['PUT'])
 def update_resource_content(google_id, resource_id):
     data = request.get_json()
-    if 'content' not in data:
-        abort(400, description="'content' field is required for update.")
+    if not data or ('content' not in data and 'name' not in data):
+        abort(400, description="Request body must contain 'content' or 'name' field(s).")
 
     try:
         # Fetch the resource to ensure it exists and belongs to the user
@@ -96,12 +96,24 @@ def update_resource_content(google_id, resource_id):
         if not resource_resp.data:
             abort(404, description="Resource not found or access denied.")
 
-        update_payload = {"content": data['content']}
+        update_payload = {}
+        if 'content' in data:
+            update_payload["content"] = data['content']
+        if 'name' in data:
+            # Basic validation for name - ensure it's not empty
+            if not data['name'] or not isinstance(data['name'], str) or not data['name'].strip():
+                 abort(400, description="'name' field cannot be empty.")
+            update_payload["name"] = data['name'].strip()
+
         # Optionally add updated_at if you have it in your schema
         # update_payload["updated_at"] = datetime.utcnow().isoformat()
 
+        if not update_payload:
+            # Should not happen due to initial check, but safe guard
+             return jsonify(message="No fields provided for update."), 200
+
         updated = supabase.table("resources").update(update_payload).eq("id", resource_id).execute()
-        
+
         # Supabase update doesn't return the full updated object by default in Python client v1 unless specified
         # Fetch the updated resource again to return it
         if updated.data: # Check if update was likely successful (affected rows > 0)
@@ -116,10 +128,12 @@ def update_resource_content(google_id, resource_id):
                  abort(500, description="Failed to retrieve updated resource.")
         else:
             # This condition might indicate the resource wasn't found or wasn't updated
+            # Note: Supabase python client v1 update().execute() might return empty data even on success if nothing matched the filter.
+            # The initial check for resource existence should prevent this, but we keep the 404 here.
             abort(404, description="Resource not found or failed to update.")
 
     except Exception as e:
-        logger.error(f"Error updating resource content: {e}")
+        logger.error(f"Error updating resource: {e}") # Generic message
         abort(500, description=str(e))
 
 @bp.route('/users/<string:google_id>/resources/<string:resource_id>/generate-mindmap', methods=['POST'])
@@ -231,7 +245,43 @@ def generate_mindmap_route(google_id, resource_id):
         # Avoid exposing raw internal errors unless necessary
         abort(500, description="An unexpected error occurred during mind map generation.")
 
-# Keep the generate-mindmaps stub or remove if replaced by the one above
+@bp.route('/users/<string:google_id>/resources/<string:resource_id>', methods=['DELETE'])
+def delete_resource_route(google_id, resource_id):
+    logger.info(f"Attempting to delete resource {resource_id} for user {google_id}")
+    try:
+        #  Verify resource exists and belongs to the user before deleting
+        resource_resp = supabase.table("resources")\
+            .select("id, user_id")\
+            .eq("id", resource_id)\
+            .eq("user_id", google_id)\
+            .maybe_single()\
+            .execute()
+
+        if not resource_resp.data:
+            logger.warning(f"Resource {resource_id} not found or access denied for user {google_id}.")
+            abort(404, description="Resource not found or access denied.")
+
+        #  Delete the resource
+        delete_resp = supabase.table("resources")\
+            .delete()\
+            .eq("id", resource_id)\
+            .execute()
+
+        # Check if deletion was successful (data might be empty even on success depending on client version/config)
+        # A more robust check might involve checking affected rows if the client provides it.
+        # Assuming success if no exception was thrown after finding the resource.
+        logger.info(f"Successfully deleted resource {resource_id} for user {google_id}")
+        return jsonify(message="Resource deleted successfully"), 200 # Or 204 No Content
+
+    except APIError as api_error:
+        logger.error(f"Supabase API error during deletion: {api_error}")
+        abort(502, description=f"Database service error during deletion: {api_error.code}")
+    except Exception as e:
+        logger.error(f"Error deleting resource {resource_id}: {e}")
+        abort(500, description="An unexpected error occurred while deleting the resource.")
+
+
+# not in use stub
 # @bp.route('/users/<string:google_id>/resources/<string:resource_id>/ai/generate-mindmaps', methods=['POST'])
 # def generate_mindmaps_route(google_id, resource_id):
 #     # stub route
