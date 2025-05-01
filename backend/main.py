@@ -77,7 +77,7 @@ class ClassCreate(BaseModel):
     name: str
     code: Optional[str] = None
     instructor: Optional[str] = None
-
+    
 class ResourceCreate(BaseModel):
     class_id: UUID
     user_id: str
