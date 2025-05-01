@@ -8,6 +8,12 @@
 
 - [ ] - @som and @naman: how can rate limiting be implemented in this? we want the user to only be able to generate around 5 videos on freemium (basic plan) and only have like 2 resources per class, and only be able to use the ai note taking capabilities per note like twice.
 
+- [ ] YOOOO WHAT IF I WAS ABLE TO INTEGRATE THIS WITH CANVAS?????!!!! Further research required
+
+  - documentation? : https://canvas.instructure.com/doc/api/index.html
+    - [ ] : @som figure out OAuth with Canvas, figure out how to do the same shit in canvs that I did with google calendar (connect button on the /profile pahe on the frontend, /canvas/auth2callback backend route or something)
+    - [ ]
+
 - [ ] setting up celery runners or whatever infrastructure that allows us to deploy and ship the video feature, and also make it so if a user reloads, then the video still stays (need to set up a chat table in supabase), idk how else to do do this yet but will figure it out
 
 - [ ] - @som and @naman: think about best deployment practices while writing code. replace all backend api calls with **process.env.NEXT_BACKEND_URL**, which's value will be stored as http://localhost:8000 for now, but will be changed to something like api.edugenie.com when we do deploy the backend with railway and deploy the frontend with vercel.
