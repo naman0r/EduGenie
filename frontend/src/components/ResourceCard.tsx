@@ -137,7 +137,7 @@ const ResourceCard: React.FC<ResourceCardProps> = ({
         <>
           {/* Content goes here, positioned relative within the card */}
           <h2
-            className="text-sky-100 font-semibold mb-2 truncate pr-16 relative z-10" // Ensure z-index, add padding for buttons
+            className="text-sky-100 font-semibold mb-2 truncate pr-16 relative z-10 " // Ensure z-index, add padding for buttons
             title={resource.name}
           >
             {resource.name}
