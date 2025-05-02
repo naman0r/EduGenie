@@ -18,6 +18,8 @@ interface UserProfile {
   last_logged_in?: string;
   // Add new fields from schema to potentially display status
   google_refresh_token?: string | null;
+  canvas_domain?: string | null; // Add canvas fields
+  canvas_access_token?: string | null; // Add canvas fields (might not be needed directly in UI)
 }
 
 // Define academic levels for the dropdown
@@ -53,6 +55,13 @@ export default function ProfilePage() {
     academic_level: "",
     institution: "",
   });
+
+  // Canvas Integration State
+  const [isCanvasConnected, setIsCanvasConnected] = useState(false);
+  const [canvasStatusMessage, setCanvasStatusMessage] = useState<string | null>(
+    null
+  );
+  const [isDisconnectingCanvas, setIsDisconnectingCanvas] = useState(false);
 
   // Effect to check auth state and fetch profile
   useEffect(() => {
@@ -96,6 +105,8 @@ export default function ProfilePage() {
             });
             // Check if calendar is already connected based on refresh token presence
             setIsCalendarConnected(!!userProfile.google_refresh_token);
+            // Check if Canvas is already connected based on domain presence
+            setIsCanvasConnected(!!userProfile.canvas_domain); // Check canvas connection
             setError(null); // Clear previous errors
           }
         } catch (err) {
@@ -127,6 +138,25 @@ export default function ProfilePage() {
       } else if (status === "callback_failed") {
         setCalendarStatusMessage(
           "Google Calendar connection failed. Please try again."
+        );
+      }
+      // Clean the URL (optional, requires navigation)
+      // router.replace('/profile', { scroll: false });
+    }
+
+    // Check for Canvas auth status from query params
+    const canvasStatus = searchParams.get("canvas_auth_status");
+    if (canvasStatus) {
+      if (canvasStatus === "success") {
+        setCanvasStatusMessage("Canvas account connected successfully!");
+        setIsCanvasConnected(true); // Assume connection if success param is present
+      } else if (canvasStatus === "error") {
+        setCanvasStatusMessage(
+          "Failed to connect Canvas account. Please check credentials and try again."
+        );
+      } else if (canvasStatus === "error_saving") {
+        setCanvasStatusMessage(
+          "Failed to save Canvas connection. Please try again."
         );
       }
       // Clean the URL (optional, requires navigation)
@@ -286,6 +316,65 @@ export default function ProfilePage() {
     }
   };
 
+  // Function to handle Canvas connection - REMOVED
+  // const handleConnectCanvas = async () => { ... };
+
+  // Function to initiate Canvas connection redirect
+  const initiateCanvasConnection = () => {
+    if (user && user.uid) {
+      router.push(`/connect/canvas?google_id=${user.uid}`);
+    } else {
+      setError("You must be logged in to connect Canvas.");
+    }
+  };
+
+  // Function to disconnect Canvas
+  const handleDisconnectCanvas = async () => {
+    if (!user || !user.uid) {
+      setCanvasStatusMessage("Error: Not logged in.");
+      return;
+    }
+
+    setIsDisconnectingCanvas(true);
+    setCanvasStatusMessage(null); // Clear previous messages
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/canvas/connect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            domain: null, // Send null to clear
+            access_token: null, // Send null to clear
+            google_id: user.uid,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            `Failed to disconnect Canvas (HTTP ${response.status})`
+        );
+      }
+
+      // Success
+      setIsCanvasConnected(false); // Update connection state
+      setCanvasStatusMessage("Canvas account disconnected successfully!");
+    } catch (err: any) {
+      console.error("Failed to disconnect Canvas:", err);
+      setCanvasStatusMessage(`Error disconnecting Canvas: ${err.message}`);
+      // Keep isCanvasConnected true on error, as the disconnection failed
+    } finally {
+      setIsDisconnectingCanvas(false);
+    }
+  };
+
   // Render loading state
   if (isLoading && !profile && !error) {
     // Show loading only if no profile/error yet
@@ -328,6 +417,19 @@ export default function ProfilePage() {
           }`}
         >
           {calendarStatusMessage}
+        </div>
+      )}
+
+      {/* Display Canvas Connection Status */}
+      {canvasStatusMessage && (
+        <div
+          className={`mb-4 p-3 rounded text-center ${
+            canvasStatusMessage.includes("success")
+              ? "bg-green-800/70 text-green-100"
+              : "bg-red-800/70 text-red-100"
+          }`}
+        >
+          {canvasStatusMessage}
         </div>
       )}
 
@@ -574,6 +676,50 @@ export default function ProfilePage() {
               </button>
             )}
           </div>
+
+          {/* Canvas Integration Section */}
+          <div className="pt-4 mt-4 border-t border-gray-700">
+            <h3 className="text-lg font-semibold mb-2 text-gray-200">
+              Canvas LMS
+            </h3>
+            {isCanvasConnected ? (
+              <div className="flex items-center justify-between p-3 bg-green-800/50 rounded">
+                <p className="text-green-100">Canvas Account Connected</p>
+                <button
+                  onClick={handleDisconnectCanvas}
+                  className="ml-4 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition duration-200 disabled:opacity-50"
+                  disabled={isDisconnectingCanvas}
+                >
+                  {isDisconnectingCanvas ? "Disconnecting..." : "Disconnect"}
+                </button>
+              </div>
+            ) : (
+              // Show initial connect button that redirects
+              <button
+                onClick={initiateCanvasConnection} // Use the new redirect function
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200 flex items-center justify-center space-x-2"
+                disabled={isLoading} // Disable while profile is loading
+              >
+                {/* Simple Canvas/LMS Icon Placeholder */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  />
+                </svg>
+                <span>Connect Canvas Account</span>
+              </button>
+            )}
+          </div>
+
           <div className="flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-700">
             <button
               onClick={() => setIsEditing(true)}
