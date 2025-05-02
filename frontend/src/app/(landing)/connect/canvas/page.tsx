@@ -65,8 +65,8 @@ export default function ConnectCanvasPage() {
         );
       }
 
-      // Success: Redirect back to profile page
-      router.push("/profile?canvas_auth_status=success");
+      // Success: Redirect to configuration page, passing google_id
+      router.push(`/connect/canvas/configure?google_id=${googleId}`);
     } catch (err: any) {
       console.error("Failed to connect Canvas:", err);
       const redirectErrorType = err.cause || "error"; // Get error type from cause or default

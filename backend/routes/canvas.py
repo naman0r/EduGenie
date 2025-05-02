@@ -65,11 +65,12 @@ def connect_canvas():
     
 @bp.route('/canvas/courses', methods =["GET"])
 def get_current_courses(): 
-    # lets see if I cooked or not
-    data = request.json
-    google_id = data.get('google_id')
+    # Read google_id from query parameters instead of body for GET request
+    google_id = request.args.get('google_id')
+    # data = request.json # No longer reading from body
+    # google_id = data.get('google_id')
     if not google_id: 
-        return jsonify({"error": "User identifier (google_id) is required"}), 400
+        return jsonify({"error": "User identifier (google_id) is required as query parameter"}), 400
     
     # step 1 is getting canvas domain and token from supabase
     res = (supabase.table('users')

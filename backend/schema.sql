@@ -89,4 +89,8 @@ add column canvas_access_token text,
 add column canvas_domain       varchar;           -- e.g. "northeastern.infrastructure.com"
 
 
+-- needed for canvas infrastructure attempt this is SO FUSSY
+ALTER TABLE public.classes
+ADD COLUMN canvas_course_id INT8; -- Or use TEXT if Canvas IDs might not always be numbers
 
+COMMENT ON COLUMN public.classes.canvas_course_id IS 'The unique identifier for the course from the Canvas LMS API.';
