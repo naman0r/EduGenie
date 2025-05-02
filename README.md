@@ -1,36 +1,11 @@
-# EduGenie (or StudyOS) Readme
+# EduGenie (or StudyOS, SillyStudy, or SillyGenie) Readme:
 
-## top priority:
+Hi! I am Naman and i'm the developer behind EduGenie. So far what we have done:
 
-- make it a PWA.
-
-### features to be implemented:
-
-- PDF upload for users sylabus; make backend logic for splitting PDF into chunks, storing it into a vector DB, and then process it and return a JSON object of course
-
-- chat feature (rate limiting to be implemented)
-
-- set up AI logic
-
-- google calendar login
-
-- Notes page, notes table in supabase, abstracting
-
-### resources logic:
-
-- A resource has....
-  - classId FK classes table
-  - userId FK users table
-  - type -> [flashcards, Mindmap, Text notes] has to be one of these
-  - name (string)
-  - createdAt -> default time.now
-  - updatedAt -> default time.now -> triggered on control s
-  - content -> JSONB content. if text notes, it is just content: text, else mindmap is a collection of nodes and edges, else flashcards is a collection of question answer pairs.
-
-routes needed in backend:
-
-- GET /{class_id}/resources : all resources for a class for a user
-- POST /{class_id}/resources : Adds a new resource for a specific user for a class
-- PUT /{class_id}/resources/{resource_id} : Edits a new resource for a specific user for a class (triggered by control s or hitting the save button)
-- DELETE /{class_id}/resources/{resource_id} : Deletes a study resource
-- GET /resources : gets ALL resources for a specific user (for the /resources route)
+- firebase auth (sign in with google popup)
+- google calendar auth (OAuth 2 to make the user verify that we can have access to their google calendar)
+- Canvas integration: UX design is bad since user has to manually fill out their personal access token from canvas. is there a way around this?
+- Resources: Text (MVP ready), mindmaps (MVP pready after some clever prompt engineering and fixing UI/UX), flashcards: Not done.
+- Chat feature: able to generate Short videos (around a minute) on any topic the user prompts
+- Supabase Schema set up for the future
+- Flask for backend, NextJs for frontend.

@@ -1,6 +1,18 @@
 # Assignment tracking for EduGenie
 
-- [ ] in this route : @bp.route('/canvas/connect', methods=['POST']) (canvas.py) we need to add validation for the url that the user inputs. eg: we need to make sure it is https:// preceeding and also has a / at the end of it.
+- [x] in this route : @bp.route('/canvas/connect', methods=['POST']) (canvas.py) we need to add validation for the url that the user inputs. eg: we need to make sure it is https:// preceeding and also has a / at the end of it.
+
+- [x] @naman : progress on canvas infrastructure: done
+
+- [ ] @som: Investigation: I have a class with a certain id that ONLY I should be able to access. however, if another user goes to http://localhost:3000/class/450a84f5-5480-4d94-b1e5-46da244e53d4 , they can access my class. Fix this. (need to secure end point by sending google_id and checking if user's google_id is same as the google_id trying to access resource)
+
+- [ ] @both: overwrite the default 404 error page (figure out how to do this), and make it fit stylistically with the rest of the app
+
+- [ ] @both: user pain point: putting personal access token for Canvas manually
+
+- [ ] @both: user pain point: not having production ready google calendar auth so it takes them to a sketchy page
+
+- [ ] @both: CLEAR UI/UX and Branding. the color theme needs to be solidified, logo needs to be redone.
 
 - [ ] : @som: once you complete onboarding to make sur eyou understand the whole application structure now, go to backend/routes.md and make sure you understand how everything works.
 
