@@ -2,6 +2,8 @@
 
 - [x] in this route : @bp.route('/canvas/connect', methods=['POST']) (canvas.py) we need to add validation for the url that the user inputs. eg: we need to make sure it is https:// preceeding and also has a / at the end of it.
 
+- [ ] @naman: implementing credits thing, revenueCat for payments
+
 - [x] @naman : progress on canvas infrastructure: done
 
 - [ ] @som: Investigation: I have a class with a certain id that ONLY I should be able to access. however, if another user goes to http://localhost:3000/class/450a84f5-5480-4d94-b1e5-46da244e53d4 , they can access my class. Fix this. (need to secure end point by sending google_id and checking if user's google_id is same as the google_id trying to access resource)
@@ -22,11 +24,11 @@
 
 - [ ] - @som and @naman: how can rate limiting be implemented in this? we want the user to only be able to generate around 5 videos on freemium (basic plan) and only have like 2 resources per class, and only be able to use the ai note taking capabilities per note like twice.
 
-- [ ] YOOOO WHAT IF I WAS ABLE TO INTEGRATE THIS WITH CANVAS?????!!!! Further research required
+<!-- - [ ] YOOOO WHAT IF I WAS ABLE TO INTEGRATE THIS WITH CANVAS?????!!!! Further research required
 
   - documentation? : https://canvas.instructure.com/doc/api/index.html
     - [ ] : @som figure out OAuth with Canvas, figure out how to do the same shit in canvs that I did with google calendar (connect button on the /profile pahe on the frontend, /canvas/auth2callback backend route or something)
-    - [ ]
+    - [ ] -->
 
 - [ ] setting up celery runners or whatever infrastructure that allows us to deploy and ship the video feature, and also make it so if a user reloads, then the video still stays (need to set up a chat table in supabase), idk how else to do do this yet but will figure it out
 
