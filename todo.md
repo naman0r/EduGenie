@@ -1,5 +1,7 @@
 # Assignment tracking for EduGenie
 
+- [ ] in this route : @bp.route('/canvas/connect', methods=['POST']) (canvas.py) we need to add validation for the url that the user inputs. eg: we need to make sure it is https:// preceeding and also has a / at the end of it.
+
 - [ ] : @som: once you complete onboarding to make sur eyou understand the whole application structure now, go to backend/routes.md and make sure you understand how everything works.
 
 - [ ] - @Som: go to frontend/app/(user)/resources/[id]/page.tsx - implement functionality for user to be able to create and view flashcards based on a text input box where the user can input CSV values for question, answer; and user should be able to UPDATE the resource, and then implement an 'ask ai' button, which is a simple chat api call which includes the current csv text content notes (stored as JSONB) and gives it to chat, asks to generate MORE flashcards in the same JSONB format inputted and then displays it on the frontend

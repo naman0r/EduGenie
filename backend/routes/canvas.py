@@ -18,21 +18,39 @@ def connect_canvas():
     access_token = data.get('access_token')
     google_id = data.get('google_id') 
 
+    normalized_domain = None
     # Check if it's a disconnection request (both domain and token are None)
     is_disconnect_request = domain is None and access_token is None
 
-    # Validate the domain and access token ONLY IF NOT disconnecting
-    if not is_disconnect_request and (not domain or not access_token):
-        return jsonify({"error": "Domain and access token are required for connection"}), 400
-    
+    # Validate and normalize the domain ONLY IF NOT disconnecting
+    if not is_disconnect_request:
+        if not domain or not access_token:
+            return jsonify({"error": "Domain and access token are required for connection"}), 400
+        
+        # Normalize the domain
+        if isinstance(domain, str): 
+            normalized_domain = domain.strip()
+            if normalized_domain.startswith('http://'):
+                normalized_domain = normalized_domain[7:]
+            elif normalized_domain.startswith('https://'):
+                normalized_domain = normalized_domain[8:]
+            normalized_domain = normalized_domain.rstrip('/')
+            normalized_domain = f"https://{normalized_domain}/"
+        else:
+            # Handle case where domain is present but not a string (shouldn't happen with JSON but good practice)
+            return jsonify({"error": "Invalid domain format"}), 400
+
     # Google ID is always required
     if not google_id:
         return jsonify({"error": "User identifier (google_id) is required"}), 400
 
     # Store or clear the credentials in the database
     try:
+        # Use normalized_domain if connecting, otherwise domain (which will be None if disconnecting)
+        domain_to_store = normalized_domain if not is_disconnect_request else domain
+        
         supabase.table('users').update({
-            'canvas_domain': domain, # Will be None if disconnecting
+            'canvas_domain': domain_to_store, 
             'canvas_access_token': access_token # Will be None if disconnecting
         }).eq('google_id', google_id).execute()
         
