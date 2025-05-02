@@ -80,3 +80,13 @@ CREATE TABLE IF NOT EXISTS notes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+-- table for canvas infrastructure attempt: 
+-- essentially just adding two tables to the existing schema; 
+alter table public.users
+add column canvas_access_token text,
+add column canvas_domain       varchar;           -- e.g. "northeastern.infrastructure.com"
+
+
+

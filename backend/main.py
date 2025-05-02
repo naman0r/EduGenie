@@ -22,7 +22,7 @@ from routes.resources import bp as resources_bp
 from routes.calendar import bp as calendar_bp
 from routes.notes import bp as notes_bp
 from routes.video import bp as video_bp
-
+from routes.canvas import bp as canvas_bp
 
 
 # Configure logging
@@ -58,7 +58,7 @@ app.register_blueprint(resources_bp)
 app.register_blueprint(calendar_bp)
 app.register_blueprint(notes_bp)
 app.register_blueprint(video_bp)
-
+app.register_blueprint(canvas_bp)
 
 # --- Pydantic Models ---
 class UserAuth(BaseModel):

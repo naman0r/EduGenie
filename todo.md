@@ -63,3 +63,7 @@ frontend: displays a list of calendar events
 - one deployment strategy is to use docker and then deploy it using ECS, another strategy is to use celery and redis (need to research further) which provides async support to our routes (should have stuck with fastapi smh)
 - ok so basically celery is a 'distributed task queue', which lets our backend logic work outside the request/response cycle, either async or on a scedule. \* note used to send emails in venu
 - really only the video generation stuff might be giving us issues with deployment at the moment.
+
+## resources:
+
+- this seems like a good resource (gradio from huggingface) : https://www.gradio.app/
