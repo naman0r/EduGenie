@@ -88,40 +88,26 @@ function NavBar({ className }: { className?: string }) {
   };
 
   return (
+    //{ showSidebar &&
     <div
-      className={cn(
-        "fixed top-10 inset-x-0 z-50 flex justify-center",
-        className
-      )}
+      className={cn("fixed top-10 inset-x-0 max-w-2xl mx-auto z-50", className)}
     >
-      {/* Error overlay */}
       {error && (
         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-3 py-1 rounded text-xs shadow-lg">
           {error}
         </div>
       )}
-      {/* Pill wrapper to clip background */}
-      <div className="relative mx-auto max-w-2xl overflow-hidden rounded-full">
-        {/* Background image for the pill */}
-        <div className="absolute inset-0 bg-[url('/nav-background.jpg')] bg-top bg-cover" />
-        {/* Menu overlay */}
-        <Menu
-          setActive={setActive}
-          className={cn(
-            "relative z-10 flex items-center justify-center space-x-8",
-            "bg-white/50 dark:bg-black/50 backdrop-blur-md",
-            "border border-gray-200 dark:border-gray-700",
-            "px-20 py-4"
-          )}
-        >
+      <div>
+        <Menu setActive={setActive}>
           <Link href="/">
             <MenuItem setActive={setActive} active={active} item="Home" />
           </Link>
+
+          {/* Auth Section */}
           {user ? (
+            // User is logged in
             <>
-              <Link href="/about">
-                <MenuItem setActive={setActive} active={active} item="About" />
-              </Link>
+              {/* Dashboard Link (Visible only when logged in) */}
               <Link href="/dashboard">
                 <MenuItem
                   setActive={setActive}
@@ -129,16 +115,19 @@ function NavBar({ className }: { className?: string }) {
                   item="Dashboard"
                 />
               </Link>
+
+              {/* Profile image links to profile page */}
               <Link href="/profile" className="flex items-center">
                 <img
                   src={user.photoURL || "/default-avatar.png"}
                   alt="Profile"
                   className="w-8 h-8 rounded-full border border-gray-300 hover:opacity-80 transition-opacity duration-200"
-                  title="Profile"
+                  title="Go to Profile"
                 />
               </Link>
             </>
           ) : (
+            // User is logged out
             <div onClick={handleLogin} className="cursor-pointer">
               <MenuItem
                 setActive={setActive}

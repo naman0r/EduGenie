@@ -404,7 +404,7 @@ export default function ProfilePage() {
 
   // Render profile display or edit form
   return (
-    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16 pb-20">
+    <div className="min-h-screen bg-black/[0.96] text-white px-4 md:px-8 lg:px-16 pb-20 pt-35">
       <h1 className="text-3xl font-bold mb-6 text-center">Your Profile</h1>
 
       {/* Display Calendar Connection Status */}

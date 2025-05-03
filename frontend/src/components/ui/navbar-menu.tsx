@@ -3,6 +3,7 @@ import React from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import Image from "next/image";
+import { cn } from "@/utils/cn";
 
 const transition = {
   type: "spring",
@@ -63,14 +64,20 @@ export const MenuItem = ({
 export const Menu = ({
   setActive,
   children,
+  className,
 }: {
   setActive: (item: string | null) => void;
   children: React.ReactNode;
+  className?: string;
 }) => {
   return (
     <nav
       onMouseLeave={() => setActive(null)} // resets the state
-      className="relative rounded-full border border-transparent dark:bg-black dark:border-white/[0.2] bg-white shadow-input flex justify-center space-x-4 px-8 py-6 "
+      className={cn(
+        "relative flex justify-center space-x-4 px-8 py-6 rounded-full border border-transparent shadow-input",
+        "bg-white/60 dark:bg-black/60 backdrop-blur-lg",
+        className
+      )}
     >
       {children}
     </nav>

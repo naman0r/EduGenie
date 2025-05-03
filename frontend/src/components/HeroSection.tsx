@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { SparklesCore } from "../components/ui/sparkles";
 import { GlowingEffect } from "./ui/glowing-effect";
 import {
@@ -10,12 +10,92 @@ import {
   Lightbulb,
   Sparkles,
   ArrowRight,
+  Send,
 } from "lucide-react";
 import Link from "next/link";
 
+// Simple Typewriter effect component
+const Typewriter = ({ text, speed = 50 }: { text: string; speed?: number }) => {
+  const [displayed, setDisplayed] = useState("");
+  useEffect(() => {
+    let idx = 0;
+    const interval = setInterval(() => {
+      setDisplayed((d) => d + text[idx]);
+      idx++;
+      if (idx >= text.length) {
+        clearInterval(interval);
+      }
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, speed]);
+  return <span>{displayed}</span>;
+};
+
+// RotatingTypewriter cycles through a list of prompts one at a time
+const RotatingTypewriter = ({
+  prompts,
+  typingSpeed = 80,
+  erasingSpeed = 40,
+  holdTime = 1500,
+}: {
+  prompts: string[];
+  typingSpeed?: number;
+  erasingSpeed?: number;
+  holdTime?: number;
+}) => {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [displayed, setDisplayed] = useState("");
+  const [phase, setPhase] = useState<"typing" | "holding" | "erasing">(
+    "typing"
+  );
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    const fullText = prompts[currentIdx];
+    if (phase === "typing") {
+      if (displayed.length < fullText.length) {
+        timeout = setTimeout(
+          () => setDisplayed(fullText.slice(0, displayed.length + 1)),
+          typingSpeed
+        );
+      } else {
+        timeout = setTimeout(() => setPhase("holding"), holdTime);
+      }
+    } else if (phase === "erasing") {
+      if (displayed.length > 0) {
+        timeout = setTimeout(
+          () => setDisplayed(displayed.slice(0, -1)),
+          erasingSpeed
+        );
+      } else {
+        setCurrentIdx((currentIdx + 1) % prompts.length);
+        setPhase("typing");
+      }
+    } else if (phase === "holding") {
+      timeout = setTimeout(() => setPhase("erasing"), holdTime);
+    }
+    return () => clearTimeout(timeout);
+  }, [
+    displayed,
+    phase,
+    currentIdx,
+    prompts,
+    typingSpeed,
+    erasingSpeed,
+    holdTime,
+  ]);
+
+  return <span>{displayed}</span>;
+};
+
 const HeroSection = () => {
+  const examplePrompts = [
+    "Generate me a mindmap on SWOT analysis",
+    "Generate flashcards on chapter 4 of my organic chemistry class",
+    "Generate a video on introducing group theory",
+  ];
   return (
-    <div className="relative w-full min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden rounded-md pt-20 pb-10 md:pt-24 md:pb-16 px-4">
+    <div className="relative w-full min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden rounded-md pt-20 pb-10 md:pt-24 md:pb-16 px-4 font-mono">
       <div className="w-full absolute inset-0 h-full z-0">
         <SparklesCore
           id="tsparticlesfullpage"
@@ -29,7 +109,7 @@ const HeroSection = () => {
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center text-center pt-35">
-        <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400 mb-4">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400 mb-4 font-mono">
           Ace Your Courses with AI
         </h1>
 
@@ -105,6 +185,41 @@ const HeroSection = () => {
             description="Get help with difficult concepts and prepare effectively for exams."
           />
         </ul>
+
+        <h1 className="pt-20 text-2xl">
+          With Useful Integrations to help you succeed
+        </h1>
+
+        {/* Integrations Showcase – mysterious pill container */}
+        <div className="relative w-full flex justify-center mt-10">
+          <div className="bg-[url('/nav-background.jpg')] bg-top bg-cover rounded-full p-2 shadow-lg overflow-hidden">
+            <div className="flex items-center space-x-12 bg-black/30 dark:bg-white/30 backdrop-blur-lg rounded-full px-10 py-4 border border-gray-700">
+              <div className="flex flex-col items-center">
+                <Sparkles className="h-6 w-6 text-white" />
+                <span className="mt-1 text-sm text-white">OpenAI</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <CalendarCheck className="h-6 w-6 text-white" />
+                <span className="mt-1 text-sm text-white">Google Calendar</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <BookOpen className="h-6 w-6 text-white" />
+                <span className="mt-1 text-sm text-white">Canvas</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Prompt CTA Section */}
+        <div className="mt-12 w-full max-w-2xl">
+          <h3 className="text-lg md:text-xl font-semibold text-neutral-200 mb-4">
+            Try these prompts:
+          </h3>
+          <button className="flex items-center mx-auto bg-white/10 hover:bg-white/20 transition-colors duration-200 rounded-lg px-4 py-2 text-neutral-100">
+            <Send className="w-5 h-5 mr-3" />
+            <RotatingTypewriter prompts={examplePrompts} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -129,7 +244,7 @@ const GridItem = ({ area, icon, title, description }: GridItemProps) => {
           disabled={false}
           proximity={64}
           inactiveZone={0.01}
-          borderWidth={10}
+          borderWidth={2}
         />
         <div className="relative flex h-full flex-col justify-between gap-6 overflow-hidden rounded-xl border border-neutral-800 bg-black/80 p-6  dark:shadow-[0px_0px_27px_0px_#2D2D2D] md:p-6">
           <div className="relative flex flex-1 flex-col justify-between gap-3">
@@ -137,12 +252,12 @@ const GridItem = ({ area, icon, title, description }: GridItemProps) => {
               {icon}
             </div>
             <div className="space-y-3">
-              <h3 className="pt-0.5 text-xl/[1.375rem] font-semibold font-sans -tracking-4 md:text-2xl/[1.875rem] text-balance text-white">
+              <h3 className="pt-0.5 text-xl/[1.375rem] font-semibold font-sans -tracking-4 md:text-2xl/[1.875rem] text-balance text-white font-mono">
                 {title}
               </h3>
               <h2
                 className="[&_b]:md:font-semibold [&_strong]:md:font-semibold font-sans text-sm/[1.125rem]
-              md:text-base/[1.375rem]  text-neutral-400"
+              md:text-base/[1.375rem]  text-neutral-400 font-mono"
               >
                 {description}
               </h2>
