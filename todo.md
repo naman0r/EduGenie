@@ -40,6 +40,16 @@
 
 - [ ] both: Need to implement backend and frontend logic for all pages in the sidebar (settings, assignments, calendar to be specific), can also add new pages (need to brainstorm which would be the best)
 
+## **CHATBOT INITIAL FUNCTIONALITY TO-DOs**:
+
+- [ ] @naman create supabase schema for the chat infrastructure
+- [ ] @naman branstorm and implement endpoints that will be needed
+- [ ] @naman redo landing page for chats (chathistory should be stored with in the database, fetched on mount, and user should have the ability to create a NEW CHAT)
+- [ ] @naman rebrand name for chat threads, working names: Wave, Genie (cool with our current name)
+- [ ] @naman implement resource tagging functionality with @, and the user being able to select resources with a dropdown menu.
+- [ ] @naman: make UX a lot better for the chat feature
+- [ ] make a footer for the web app (privacy policy, terms of service, disclosure on how we use integrations, etc.)
+
 ## **IDEA**:
 
 - point based access to features for edugenie users.

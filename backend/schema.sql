@@ -31,7 +31,8 @@ CREATE TABLE classes (
     name TEXT NOT NULL,                  -- Name of the class (e.g., "Introduction to AI")
     code VARCHAR(50),                    -- Course code (e.g., "CS 101"), optional
     instructor VARCHAR(255),             -- Instructor's name, optional
-    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) -- When the class was added
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()), -- When the class was added
+    canvas_course_id INT8 -- Or use TEXT if Canvas IDs might not always be numbers
 );
 
 -- Optional: Index for faster lookups by user
@@ -43,6 +44,7 @@ COMMENT ON COLUMN classes.user_id IS 'Foreign key referencing the google_id in t
 COMMENT ON COLUMN classes.name IS 'The display name of the course.';
 COMMENT ON COLUMN classes.code IS 'Optional course code (e.g., MATH201).';
 COMMENT ON COLUMN classes.instructor IS 'Optional name of the course instructor.';
+COMMENT ON COLUMN classes.canvas_course_id IS 'The unique identifier for the course from the Canvas LMS API.';
 
 
 
@@ -94,3 +96,60 @@ ALTER TABLE public.classes
 ADD COLUMN canvas_course_id INT8; -- Or use TEXT if Canvas IDs might not always be numbers
 
 COMMENT ON COLUMN public.classes.canvas_course_id IS 'The unique identifier for the course from the Canvas LMS API.';
+
+
+-- ============================
+-- Chat Feature Tables
+-- ============================
+
+-- Define ENUM types for sender and resource types
+DO $$ BEGIN
+    CREATE TYPE chat_sender_type AS ENUM ('user', 'ai');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE chat_resource_type AS ENUM ('mindmap', 'video', 'flashcards', 'text');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+
+-- Table to store individual chat sessions (Genies)
+CREATE TABLE chats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR NOT NULL REFERENCES users(google_id) ON DELETE CASCADE,
+    name TEXT NOT NULL, -- Name of the chat/Genie given by the user
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) -- Track last interaction
+);
+
+-- Index for faster lookup of chats by user
+CREATE INDEX idx_chats_user_id ON chats(user_id);
+
+COMMENT ON TABLE chats IS 'Stores individual chat sessions (Genies) initiated by users.';
+COMMENT ON COLUMN chats.name IS 'User-defined name for the chat session.';
+
+
+-- Table to store messages within each chat session
+CREATE TABLE chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    sender chat_sender_type NOT NULL, -- 'user' or 'ai'
+    message_text TEXT, -- The textual content of the message
+    resource_type chat_resource_type, -- Type of attached/generated resource (optional)
+    -- resource_id UUID, -- Optional FK to a specific resource table if needed for complex linking
+    content JSONB, -- Stores structured data, e.g., mind map nodes/edges, video URL, user input details
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
+);
+
+-- Indexes for faster lookup of messages
+CREATE INDEX idx_chat_messages_chat_id ON chat_messages(chat_id);
+CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at DESC); -- For ordering
+
+COMMENT ON TABLE chat_messages IS 'Stores individual messages exchanged within a chat session.';
+COMMENT ON COLUMN chat_messages.sender IS 'Indicates whether the message is from the user or the AI.';
+COMMENT ON COLUMN chat_messages.message_text IS 'The primary textual content of the message.';
+COMMENT ON COLUMN chat_messages.resource_type IS 'Indicates the type of rich content associated with the message, if any.';
+COMMENT ON COLUMN chat_messages.content IS 'JSONB field to store structured data related to the message (e.g., resource details, user input parameters).';
