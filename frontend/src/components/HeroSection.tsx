@@ -90,9 +90,9 @@ const RotatingTypewriter = ({
 
 const HeroSection = () => {
   const examplePrompts = [
-    "Generate me a mindmap on SWOT analysis",
-    "Generate flashcards on chapter 4 of my organic chemistry class",
-    "Generate a video on introducing group theory",
+    "Ask EduGenie to generate a mindmap on SWOT analysis of a business",
+    "Ask EduGenie to make flashcards for chapter 4 of my organic chemistry class",
+    "Ask EduGenie to generate a video on introducing group theory",
   ];
   return (
     <div className="relative w-full min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden rounded-md pt-20 pb-10 md:pt-24 md:pb-16 px-4 font-mono">
@@ -101,10 +101,11 @@ const HeroSection = () => {
           id="tsparticlesfullpage"
           background="transparent"
           minSize={0.6}
-          maxSize={1.4}
-          particleDensity={80}
+          maxSize={1.5}
+          particleDensity={200}
           className="w-full h-full"
-          particleColor="#FFFFFF"
+          particleColor="#05ff71"
+          //particleColor="#26d0ff"
         />
       </div>
 
