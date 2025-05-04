@@ -55,8 +55,176 @@ export default function ChatThreadPage() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    // TODO: POST message to backend when endpoint ready
+    const googleId =
+      typeof window !== "undefined" ? localStorage.getItem("google_id") : null;
+    if (!googleId) return;
+
+    // Create message object for UI
+    const userMessage: ChatMessage = {
+      id: `temp-${Date.now()}`, // Temporary ID until we get response
+      sender: "user",
+      message_text: input,
+      resource_type: null,
+      content: null,
+    };
+
+    // Detect special commands
+    const hasCommand = /@(mindmap|video|flashcards)\s+(.+)/i.exec(input);
+    if (hasCommand) {
+      const [, commandType, content] = hasCommand;
+      userMessage.resource_type = commandType.toLowerCase();
+    }
+
+    // Add message to UI
+    setMessages((prev) => [...prev, userMessage]);
+
+    // Clear input
     setInput("");
+
+    // Set loading state
+    setIsLoading(true);
+
+    try {
+      // Send message to API
+      const resp = await fetch(`${API_URL}/chats/${chatId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message_text: userMessage.message_text,
+          sender: "user",
+          user_id: googleId,
+          resource_type: userMessage.resource_type,
+        }),
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        throw new Error(errorData.description || resp.statusText);
+      }
+
+      const savedMsg = await resp.json();
+
+      // Replace temporary message with saved one
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === userMessage.id ? savedMsg : msg))
+      );
+
+      // If this was a special command, we'll need to handle it
+      if (hasCommand) {
+        // For now, we'll simulate a delay for the AI response
+        setTimeout(() => {
+          processSpecialCommand(hasCommand[1], hasCommand[2]);
+        }, 1000);
+      } else {
+        // Regular message, simulate AI thinking...
+        setTimeout(() => {
+          sendAIResponse(userMessage.message_text);
+        }, 1000);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to send message");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Process special commands like @mindmap, @video, etc.
+  const processSpecialCommand = async (command: string, content: string) => {
+    const googleId = localStorage.getItem("google_id");
+    if (!googleId) return;
+
+    // Add a "thinking" message from AI
+    const aiMessage: ChatMessage = {
+      id: `temp-ai-${Date.now()}`,
+      sender: "ai",
+      message_text: `Creating a ${command} about "${content}"...`,
+      resource_type: null,
+      content: null,
+    };
+
+    setMessages((prev) => [...prev, aiMessage]);
+
+    // Here we would make the actual API calls to generate resources
+    // For now, let's just simulate a response after 2 seconds
+    setTimeout(() => {
+      // Simulate an AI response with the mock resource
+      const mockResponse: ChatMessage = {
+        id: `generated-${Date.now()}`,
+        sender: "ai",
+        message_text: `Here's a ${command} for "${content}"`,
+        resource_type: command,
+        content: command === "mindmap" ? getMockMindmapData(content) : null,
+      };
+
+      // Replace the thinking message
+      setMessages((prev) =>
+        prev.filter((msg) => msg.id !== aiMessage.id).concat(mockResponse)
+      );
+
+      // In a real implementation, we would save this message to the backend
+    }, 2000);
+  };
+
+  // Generate a mock mindmap for demo purposes
+  const getMockMindmapData = (topic: string) => {
+    const mainNode = {
+      id: "1",
+      data: { label: topic },
+      position: { x: 250, y: 5 },
+    };
+    const childNodes = [
+      { id: "2", data: { label: "Sub-topic 1" }, position: { x: 100, y: 100 } },
+      { id: "3", data: { label: "Sub-topic 2" }, position: { x: 250, y: 100 } },
+      { id: "4", data: { label: "Sub-topic 3" }, position: { x: 400, y: 100 } },
+    ];
+
+    const edges = [
+      { id: "e1-2", source: "1", target: "2" },
+      { id: "e1-3", source: "1", target: "3" },
+      { id: "e1-4", source: "1", target: "4" },
+    ];
+
+    return {
+      nodes: [mainNode, ...childNodes],
+      edges,
+      resource_id: `mindmap-${Date.now()}`,
+    };
+  };
+
+  // Send a regular AI response
+  const sendAIResponse = async (userMessage: string) => {
+    const googleId = localStorage.getItem("google_id");
+    if (!googleId) return;
+
+    // Add a "thinking" message from AI
+    const thinkingMessage: ChatMessage = {
+      id: `thinking-${Date.now()}`,
+      sender: "ai",
+      message_text: "Thinking...",
+      resource_type: null,
+      content: null,
+    };
+
+    setMessages((prev) => [...prev, thinkingMessage]);
+
+    // In a real implementation, we would call an AI API here
+    // For now, just simulate a response after a delay
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        sender: "ai",
+        message_text: `I received your message: "${userMessage}". In a complete implementation, I would respond with AI-generated content. You can try commands like "@mindmap [topic]" to see special resource generation.`,
+        resource_type: null,
+        content: null,
+      };
+
+      // Replace the thinking message with the real response
+      setMessages((prev) =>
+        prev.filter((msg) => msg.id !== thinkingMessage.id).concat(aiResponse)
+      );
+
+      // Save AI message to backend (in a real implementation)
+    }, 1500);
   };
 
   const handleMention = (optionKey: string) => {
