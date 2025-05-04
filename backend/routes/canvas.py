@@ -5,6 +5,8 @@ from flask import Blueprint, request, jsonify, abort
 import logging
 from initdb import supabase
 import requests
+import json
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -126,3 +128,235 @@ def get_current_courses():
 @bp.route('/testcanvas', methods=['GET'])
 def test_canvas(): 
     return jsonify({"message": "you are not dumb"}), 200
+
+@bp.route('/canvas/assignments/<string:course_id>', methods=['GET'])
+def get_canvas_assignments(course_id):
+    """Fetch assignments from Canvas for a specific course."""
+    google_id = request.args.get('google_id')
+    
+    if not google_id:
+        return jsonify({"error": "User identifier (google_id) is required as query parameter"}), 400
+    
+    if not course_id:
+        return jsonify({"error": "Course ID is required"}), 400
+    
+    # Get Canvas credentials
+    try:
+        res = (supabase.table('users')
+                        .select('canvas_domain, canvas_access_token')
+                        .eq('google_id', google_id)
+                        .single()
+                        .execute())
+        
+        if res.data is None:
+            logger.error(f"Error fetching Canvas credentials for {google_id}")
+            return jsonify({"error": "User not found or not connected to Canvas"}), 404
+        
+        row = res.data
+        token = row.get('canvas_access_token')
+        domain = row.get('canvas_domain')
+        
+        if not token or not domain:
+            return jsonify({"error": "Canvas credentials not found"}), 400
+        
+    except Exception as e:
+        logger.error(f"Database error fetching Canvas credentials: {e}")
+        return jsonify({"error": "Database error"}), 500
+    
+    # Fetch assignments from Canvas
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {"bucket": "upcoming", "order_by": "due_at"}
+    url = f"{domain}/api/v1/courses/{course_id}/assignments"
+    
+    try:
+        assignments = []
+        while url:
+            resp = requests.get(url, headers=headers, params=params, timeout=10)
+            if resp.status_code != 200:
+                logger.warning(f"Canvas API error {resp.status_code}: {resp.text[:200]}")
+                return jsonify({"error": "Canvas API error", "details": resp.text}), resp.status_code
+            
+            assignments.extend(resp.json())
+            # Handle pagination
+            url = resp.links.get('next', {}).get('url')
+            params = None  # Only on first iteration
+        
+    except requests.exceptions.RequestException as e:
+        logger.exception("Network error reaching Canvas")
+        return jsonify({"error": "Could not reach Canvas"}), 502
+    
+    # Process assignments to match our format
+    processed_assignments = []
+    for assignment in assignments:
+        processed_assignments.append({
+            "id": assignment.get("id"),
+            "title": assignment.get("name"),
+            "description": assignment.get("description"),
+            "due_date": assignment.get("due_at"),
+            "html_url": assignment.get("html_url"),
+            "submission_types": assignment.get("submission_types"),
+            "points_possible": assignment.get("points_possible")
+        })
+    
+    return jsonify(processed_assignments), 200
+
+@bp.route('/classes/<string:class_id>/canvas/import-assignments', methods=['POST'])
+def import_canvas_assignments(class_id):
+    """Import assignments from Canvas into the tasks table."""
+    data = request.json
+    google_id = data.get('google_id')
+    assignment_ids = data.get('assignment_ids', [])  # List of Canvas assignment IDs to import
+    
+    if not google_id:
+        return jsonify({"error": "User identifier (google_id) is required"}), 400
+    
+    if not assignment_ids:
+        return jsonify({"error": "No assignments selected for import"}), 400
+    
+    # Verify the class exists and belongs to the user
+    try:
+        class_check = (supabase.table('classes')
+                              .select('id, canvas_course_id')
+                              .eq('id', class_id)
+                              .eq('user_id', google_id)
+                              .single()
+                              .execute())
+        
+        if not class_check.data:
+            return jsonify({"error": "Class not found or not owned by user"}), 404
+        
+        canvas_course_id = class_check.data.get('canvas_course_id')
+        if not canvas_course_id:
+            return jsonify({"error": "This class is not linked to a Canvas course"}), 400
+        
+    except Exception as e:
+        logger.error(f"Database error checking class: {e}")
+        return jsonify({"error": "Database error"}), 500
+    
+    # Get Canvas credentials
+    try:
+        user_resp = (supabase.table('users')
+                            .select('canvas_domain, canvas_access_token')
+                            .eq('google_id', google_id)
+                            .single()
+                            .execute())
+        
+        if not user_resp.data:
+            return jsonify({"error": "User not found or not connected to Canvas"}), 404
+        
+        token = user_resp.data.get('canvas_access_token')
+        domain = user_resp.data.get('canvas_domain')
+        
+        if not token or not domain:
+            return jsonify({"error": "Canvas credentials not found"}), 400
+        
+    except Exception as e:
+        logger.error(f"Database error fetching user Canvas credentials: {e}")
+        return jsonify({"error": "Database error"}), 500
+    
+    # Fetch assignments from Canvas to get details
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{domain}/api/v1/courses/{canvas_course_id}/assignments"
+    params = {"assignment_ids[]": assignment_ids}
+    
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
+        if resp.status_code != 200:
+            logger.warning(f"Canvas API error {resp.status_code}: {resp.text[:200]}")
+            return jsonify({"error": "Canvas API error", "details": resp.text}), resp.status_code
+        
+        canvas_assignments = resp.json()
+        
+    except requests.exceptions.RequestException as e:
+        logger.exception("Network error reaching Canvas")
+        return jsonify({"error": "Could not reach Canvas"}), 502
+    
+    # Insert assignments into tasks table
+    imported_tasks = []
+    for assignment in canvas_assignments:
+        if assignment.get('id') not in assignment_ids:
+            continue
+            
+        # Check if this assignment is already imported
+        existing_check = (supabase.table('tasks')
+                                 .select('id')
+                                 .eq('class_id', class_id)
+                                 .eq('user_id', google_id)
+                                 .eq('canvas_assignment_id', assignment.get('id'))
+                                 .maybe_single()
+                                 .execute())
+        
+        if existing_check.data:
+            # Skip already imported assignments or update them if desired
+            continue
+        
+        # Prepare the task data
+        task_data = {
+            'class_id': class_id,
+            'user_id': google_id,
+            'title': assignment.get('name'),
+            'description': assignment.get('description'),
+            'type': 'assignment',
+            'due_date': assignment.get('due_at'),
+            'status': 'pending',
+            'from_canvas': True,
+            'canvas_assignment_id': assignment.get('id'),
+            'canvas_html_url': assignment.get('html_url'),
+            'submission_types': json.dumps(assignment.get('submission_types', [])),
+        }
+        
+        # Insert the task
+        try:
+            task_insert = supabase.table('tasks').insert(task_data).execute()
+            if task_insert.data:
+                imported_tasks.append(task_insert.data[0])
+        except Exception as e:
+            logger.error(f"Error inserting task from Canvas: {e}")
+            # Continue to next assignment instead of aborting
+    
+    return jsonify({
+        "message": f"Successfully imported {len(imported_tasks)} assignments",
+        "imported_tasks": imported_tasks
+    }), 201
+
+@bp.route('/classes/<string:class_id>/tasks', methods=['GET'])
+def get_class_tasks(class_id):
+    """Get all tasks for a specific class."""
+    google_id = request.args.get('google_id')
+    
+    if not google_id:
+        return jsonify({"error": "User identifier (google_id) is required as query parameter"}), 400
+    
+    if not class_id:
+        return jsonify({"error": "Class ID is required"}), 400
+    
+    # Verify the class exists and belongs to the user
+    try:
+        class_check = (supabase.table('classes')
+                              .select('id')
+                              .eq('id', class_id)
+                              .eq('user_id', google_id)
+                              .single()
+                              .execute())
+        
+        if not class_check.data:
+            return jsonify({"error": "Class not found or not owned by user"}), 404
+        
+    except Exception as e:
+        logger.error(f"Database error checking class: {e}")
+        return jsonify({"error": "Database error"}), 500
+    
+    # Get all tasks for the class
+    try:
+        tasks_resp = (supabase.table('tasks')
+                             .select('*')
+                             .eq('class_id', class_id)
+                             .eq('user_id', google_id)
+                             .order('due_date', desc=False)
+                             .execute())
+        
+        return jsonify(tasks_resp.data), 200
+        
+    except Exception as e:
+        logger.error(f"Database error fetching tasks: {e}")
+        return jsonify({"error": "Database error"}), 500

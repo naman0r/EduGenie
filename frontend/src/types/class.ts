@@ -5,4 +5,5 @@ export interface ClassData {
   code?: string | null;
   instructor?: string | null;
   created_at: string;
+  canvas_course_id?: number;
 }

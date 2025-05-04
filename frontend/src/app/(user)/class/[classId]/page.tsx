@@ -8,42 +8,8 @@ import Link from "next/link";
 import { ResourceInfo } from "@/types/resources";
 import { Task } from "@/types/task";
 import { ClassData } from "@/types/class";
-
-// Mock Task Data TODO create a task table on supabase.
-const mockTasks: Task[] = [
-  {
-    id: "task-1",
-    title: "Problem Set 1",
-    assigned_date: "2024-08-01",
-    deadline: "2024-08-15",
-    personal_completion_deadline: "2024-08-13",
-    status: "pending",
-  },
-  {
-    id: "task-2",
-    title: "Read Chapter 3",
-    assigned_date: "2024-08-05",
-    deadline: "2024-08-12",
-    personal_completion_deadline: "2024-08-11",
-    status: "in-progress",
-  },
-  {
-    id: "task-3",
-    title: "Midterm Paper Outline",
-    assigned_date: "2024-08-10",
-    deadline: "2024-08-25",
-    personal_completion_deadline: "2024-08-22",
-    status: "pending",
-  },
-  {
-    id: "task-4",
-    title: "Lab Report 1 (Completed)",
-    assigned_date: "2024-07-20",
-    deadline: "2024-08-05",
-    personal_completion_deadline: "2024-08-03",
-    status: "completed",
-  },
-];
+import TaskCard from "@/components/TaskCard";
+import CanvasAssignmentsModal from "@/components/CanvasAssignmentsModal";
 
 export default function ClassDetailsPage() {
   const params = useParams();
@@ -67,6 +33,14 @@ export default function ClassDetailsPage() {
   >("selectType");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [newResourceName, setNewResourceName] = useState<string>("");
+
+  // --- Tasks (Assignments) State ---
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+
+  // --- Canvas Assignments Modal State ---
+  const [showCanvasModal, setShowCanvasModal] = useState(false);
 
   // *** RESTORE SYLLABUS STATE HERE ***
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -198,15 +172,82 @@ export default function ClassDetailsPage() {
     }
   }, [user, classId]);
 
-  // --- Trigger Fetch Resources Effect ---
+  // --- Fetch Tasks Effect ---
+  const fetchTasks = useCallback(async () => {
+    if (!user || !classId) return;
+
+    setTasksLoading(true);
+    setTasksError(null);
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/tasks?google_id=${user.uid}`
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch tasks: ${response.status} - ${errorText}`
+        );
+      }
+
+      const data: Task[] = await response.json();
+      setTasks(data);
+    } catch (err: any) {
+      console.error("Failed to fetch tasks:", err);
+      setTasksError("Failed to load tasks. Please try again later.");
+    } finally {
+      setTasksLoading(false);
+    }
+  }, [user, classId]);
+
+  // --- Handle Task Status Change ---
+  const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
+    if (!user || !classId) return;
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/tasks/${taskId}/status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            google_id: user.uid,
+            status: newStatus,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to update task status: ${response.status}`);
+      }
+
+      // Update local state
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === taskId ? { ...task, status: newStatus as any } : task
+        )
+      );
+    } catch (err: any) {
+      console.error("Failed to update task status:", err);
+      // Could show an error toast or message here
+    }
+  };
+
+  // --- Trigger Fetch Resources and Tasks Effect ---
   useEffect(() => {
-    // Fetch resources only after the initial class load attempt is finished (!isLoading)
-    // and the user is available.
     if (!isLoading && user && classId) {
       fetchResources();
+      fetchTasks();
     }
-    // Add classId as a dependency here too
-  }, [isLoading, user, classId, fetchResources]);
+  }, [isLoading, user, classId, fetchResources, fetchTasks]);
+
+  // --- Handle Canvas Assignments Import Success ---
+  const handleCanvasImportSuccess = () => {
+    fetchTasks(); // Refresh tasks after import
+  };
 
   // --- Handle Resource Creation (Actual API call) ---
   // Renamed to indicate it performs the final action
@@ -295,11 +336,15 @@ export default function ClassDetailsPage() {
 
   //  Combined Loading State
   // Show loading if class details are loading OR resources are loading
-  if (isLoading || resourcesLoading) {
+  if (isLoading || resourcesLoading || tasksLoading) {
     return (
       <div className="min-h-screen bg-black/[0.96] text-white flex justify-center items-center">
         {/* Be more specific if possible */}
-        {isLoading ? "Loading class details..." : "Loading resources..."}
+        {isLoading
+          ? "Loading class details..."
+          : resourcesLoading
+          ? "Loading resources..."
+          : "Loading tasks..."}
       </div>
     );
   }
@@ -510,62 +555,81 @@ export default function ClassDetailsPage() {
 
         {/* Right Panel: Task List */}
         <div className="bg-gray-800/30 p-6 rounded-lg shadow-xl w-full lg:w-2/3">
-          <h2 className="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">
-            Upcoming Tasks & Assignments
-          </h2>
-          <div className="space-y-4">
-            {mockTasks.length === 0 ? (
-              <p className="text-gray-400 italic">
-                No tasks added for this class yet.
-              </p>
-            ) : (
-              mockTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="bg-gray-700/50 p-4 rounded-md border border-gray-600 hover:bg-gray-700/70 transition duration-150"
+          <div className="flex justify-between items-center mb-4 border-b border-gray-600 pb-2">
+            <h2 className="text-xl font-semibold">
+              Upcoming Tasks & Assignments
+            </h2>
+
+            {/* Show Canvas Import button only if canvas_course_id exists */}
+            {classDetails.canvas_course_id && (
+              <button
+                onClick={() => setShowCanvasModal(true)}
+                className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm flex items-center"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4 mr-1"
                 >
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-medium text-gray-100">
-                      {task.title}
-                    </h3>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        task.status === "completed"
-                          ? "bg-green-500/20 text-green-300"
-                          : task.status === "in-progress"
-                          ? "bg-yellow-500/20 text-yellow-300"
-                          : "bg-gray-500/20 text-gray-300"
-                      }`}
-                    >
-                      {task.status}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-1 text-sm text-gray-400">
-                    <div>
-                      Assigned:{" "}
-                      <span className="text-gray-300">
-                        {task.assigned_date}
-                      </span>
-                    </div>
-                    <div>
-                      Deadline:{" "}
-                      <span className="text-red-400 font-medium">
-                        {task.deadline}
-                      </span>
-                    </div>
-                    <div>
-                      Personal Goal:{" "}
-                      <span className="text-blue-400">
-                        {task.personal_completion_deadline}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Import from Canvas
+              </button>
+            )}
+          </div>
+
+          {tasksError && (
+            <p className="text-red-500 mb-4">
+              Error loading tasks: {tasksError}
+            </p>
+          )}
+
+          <div className="space-y-4">
+            {!tasksLoading && tasks.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <p className="mb-4">
+                  No tasks or assignments added for this class yet.
+                </p>
+                {classDetails.canvas_course_id && (
+                  <button
+                    onClick={() => setShowCanvasModal(true)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                  >
+                    Import Assignments from Canvas
+                  </button>
+                )}
+              </div>
+            ) : (
+              tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onStatusChange={handleTaskStatusChange}
+                />
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* Canvas Assignments Import Modal */}
+      {user && classDetails.canvas_course_id && (
+        <CanvasAssignmentsModal
+          isOpen={showCanvasModal}
+          onClose={() => setShowCanvasModal(false)}
+          userId={user.uid}
+          classId={classId}
+          canvasCourseId={classDetails.canvas_course_id}
+          onImportSuccess={handleCanvasImportSuccess}
+        />
+      )}
 
       {/* Display Class ID for reference */}
       <p className="text-xs text-gray-600 mt-10">Class ID: {classDetails.id}</p>
