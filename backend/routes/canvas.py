@@ -6,6 +6,7 @@ import logging
 from initdb import supabase
 import requests
 import json
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -170,20 +171,46 @@ def get_canvas_assignments(course_id):
     
     try:
         assignments = []
-        while url:
-            resp = requests.get(url, headers=headers, params=params, timeout=10)
-            if resp.status_code != 200:
-                logger.warning(f"Canvas API error {resp.status_code}: {resp.text[:200]}")
-                return jsonify({"error": "Canvas API error", "details": resp.text}), resp.status_code
+        retry_count = 0
+        max_retries = 2
+        
+        while url and retry_count <= max_retries:
+            try:
+                resp = requests.get(url, headers=headers, params=params, timeout=10)
+                
+                if resp.status_code == 200:
+                    # Success - process the data and continue
+                    assignments.extend(resp.json())
+                    # Handle pagination
+                    url = resp.links.get('next', {}).get('url')
+                    params = None  # Only on first iteration
+                    retry_count = 0  # Reset retry count on success
+                else:
+                    logger.warning(f"Canvas API error {resp.status_code}: {resp.text[:200]}")
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        logger.info(f"Retrying Canvas API request (attempt {retry_count}/{max_retries})")
+                        time.sleep(1)  # Add a small delay before retry
+                    else:
+                        # Return error if max retries reached
+                        return jsonify({
+                            "error": "Canvas API error", 
+                            "details": resp.text,
+                            "status_code": resp.status_code
+                        }), resp.status_code
             
-            assignments.extend(resp.json())
-            # Handle pagination
-            url = resp.links.get('next', {}).get('url')
-            params = None  # Only on first iteration
+            except requests.exceptions.Timeout:
+                # Handle timeout specifically
+                if retry_count < max_retries:
+                    retry_count += 1
+                    logger.info(f"Canvas API request timed out, retrying (attempt {retry_count}/{max_retries})")
+                    time.sleep(1)
+                else:
+                    raise
         
     except requests.exceptions.RequestException as e:
         logger.exception("Network error reaching Canvas")
-        return jsonify({"error": "Could not reach Canvas"}), 502
+        return jsonify({"error": "Could not reach Canvas", "details": str(e)}), 502
     
     # Process assignments to match our format
     processed_assignments = []
@@ -277,17 +304,28 @@ def import_canvas_assignments(class_id):
         if assignment.get('id') not in assignment_ids:
             continue
             
-        # Check if this assignment is already imported
-        existing_check = (supabase.table('tasks')
-                                 .select('id')
-                                 .eq('class_id', class_id)
-                                 .eq('user_id', google_id)
-                                 .eq('canvas_assignment_id', assignment.get('id'))
-                                 .maybe_single()
-                                 .execute())
-        
-        if existing_check.data:
-            # Skip already imported assignments or update them if desired
+        # Check if this assignment is already imported - use more careful error handling
+        try:
+            # Convert Canvas assignment ID to string for safety
+            canvas_assignment_id_str = str(assignment.get('id'))
+            
+            # First check if assignment already exists
+            existing_query = (supabase.table('tasks')
+                             .select('id')
+                             .eq('class_id', class_id)
+                             .eq('user_id', google_id)
+                             .eq('canvas_assignment_id', assignment.get('id')))
+            
+            existing_check = existing_query.execute()
+            
+            # Skip if assignment already exists
+            if existing_check and existing_check.data and len(existing_check.data) > 0:
+                logger.info(f"Skipping already imported assignment: {assignment.get('id')}")
+                continue
+                
+        except Exception as e:
+            logger.error(f"Error checking for existing task: {e}")
+            # Don't abort, just log and continue to next assignment
             continue
         
         # Prepare the task data
@@ -308,8 +346,10 @@ def import_canvas_assignments(class_id):
         # Insert the task
         try:
             task_insert = supabase.table('tasks').insert(task_data).execute()
-            if task_insert.data:
+            if task_insert and task_insert.data:
                 imported_tasks.append(task_insert.data[0])
+            else:
+                logger.warning(f"Task insert returned no data for assignment {assignment.get('id')}")
         except Exception as e:
             logger.error(f"Error inserting task from Canvas: {e}")
             # Continue to next assignment instead of aborting

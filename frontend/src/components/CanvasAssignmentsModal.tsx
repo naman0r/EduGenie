@@ -125,15 +125,31 @@ const CanvasAssignmentsModal: React.FC<CanvasAssignmentsModalProps> = ({
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to import assignments");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error || `Server error: ${response.status}`
+          );
+        } else {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to import assignments (${
+              response.status
+            }): ${errorText.substring(0, 100)}`
+          );
+        }
       }
 
+      const result = await response.json();
+      console.log("Import successful:", result);
       onImportSuccess();
       onClose();
     } catch (err: any) {
       console.error("Error importing assignments:", err);
-      setError(err.message || "Failed to import assignments");
+      setError(
+        err.message || "Failed to import assignments. Please try again."
+      );
     } finally {
       setImporting(false);
     }
