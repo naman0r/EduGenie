@@ -14,6 +14,7 @@ interface UserProfile {
   academic_level: string | null;
   institution: string | null;
   plan_type: string | null;
+  credits: number | null;
   created_at?: string;
   last_logged_in?: string;
   // Add new fields from schema to potentially display status
@@ -62,6 +63,34 @@ export default function ProfilePage() {
     null
   );
   const [isDisconnectingCanvas, setIsDisconnectingCanvas] = useState(false);
+
+  const [credits, setCredits] = useState<number>(0);
+
+  useEffect(() => {
+    const handleCreditLoading = async () => {
+      const google_id = localStorage.getItem("google_id");
+      try {
+        console.log("fetching credits for user");
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/credits/${google_id}/get_credits`,
+          {
+            method: "GET",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch credits");
+        }
+
+        const data = await response.json();
+        setCredits(data.credits);
+      } catch (error) {
+        console.error("Error fetching credits:", error);
+      }
+    };
+    handleCreditLoading();
+  }, []);
 
   // Effect to check auth state and fetch profile
   useEffect(() => {
@@ -623,6 +652,12 @@ export default function ProfilePage() {
               Plan:
             </span>{" "}
             {profile?.plan_type || "basic"}
+          </p>
+          <p>
+            <span className="font-semibold text-gray-400 capitalize">
+              credits:
+            </span>{" "}
+            {credits}
           </p>
           {/* Google Calendar Connection Section */}
           <div className="pt-4 mt-4 border-t border-gray-700">

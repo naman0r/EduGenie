@@ -7,6 +7,7 @@ import Link from "next/link";
 import { auth, googleProvider, signInWithPopup } from "@/utils/firebase";
 import { User } from "firebase/auth";
 import { usePathname } from "next/navigation";
+import { ChevronsUp } from "lucide-react";
 
 const syncUserWithBackend = async (userData: User) => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -45,6 +46,8 @@ function NavBar({ className }: { className?: string }) {
   const pathname = usePathname();
   const showSidebar = pathname === "/" || pathname === "/profile";
 
+  const [credits, setCredits] = useState<number>(0);
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
@@ -59,6 +62,32 @@ function NavBar({ className }: { className?: string }) {
       }
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const handleCreditLoading = async () => {
+      const google_id = localStorage.getItem("google_id");
+      try {
+        console.log("fetching credits for user");
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/credits/${google_id}/get_credits`,
+          {
+            method: "GET",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch credits");
+        }
+
+        const data = await response.json();
+        setCredits(data.credits);
+      } catch (error) {
+        console.error("Error fetching credits:", error);
+      }
+    };
+    handleCreditLoading();
   }, []);
 
   const handleLogin = async () => {
@@ -128,6 +157,12 @@ function NavBar({ className }: { className?: string }) {
                   active={active}
                   item="Dashboard"
                 />
+              </Link>
+              <Link
+                href="/profile"
+                className="text-sm text-gray-100 flex items-center gap-2"
+              >
+                <ChevronsUp className="w-4 h-4" />: {credits}
               </Link>
               <Link href="/profile" className="flex items-center">
                 <img

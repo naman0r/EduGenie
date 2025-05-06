@@ -12,6 +12,7 @@ CREATE TABLE users (
     academic_level VARCHAR(50),                -- e.g., 'High School', 'Undergraduate', 'Graduate', 'Postgraduate' - Allow NULL initially
     institution VARCHAR(255),                  -- Name of the school/university - Allow NULL initially
     plan_type VARCHAR(50) DEFAULT 'basic' NOT NULL -- 'basic' or 'premium' later on
+    credits INT DEFAULT 0; -- Number of credits the user has
 );
 
 -- Add columns for Google Calendar OAuth Tokens
@@ -20,9 +21,17 @@ ADD COLUMN IF NOT EXISTS google_refresh_token TEXT,
 ADD COLUMN IF NOT EXISTS google_access_token TEXT,
 ADD COLUMN IF NOT EXISTS google_token_expiry TIMESTAMPTZ;
 
+
+-- Add credits column to users table
+ALTER TABLE users
+ADD COLUMN credits INT DEFAULT 20; -- default 20 credits when the user starts. 
+
+COMMENT ON COLUMN users.credits IS 'Number of credits the user has for interacting with generative AI features.';
+
 COMMENT ON COLUMN users.google_refresh_token IS 'Encrypted Google OAuth refresh token for Calendar access';
 COMMENT ON COLUMN users.google_access_token IS 'Temporary Google OAuth access token';
 COMMENT ON COLUMN users.google_token_expiry IS 'Expiry time for the Google access token';
+COMMENT ON COLUMN users.credits IS 'Number of credits the user has for interacting with generative AI features.';
 
 -- Table to store user classes
 CREATE TABLE classes (
@@ -182,3 +191,4 @@ COMMENT ON COLUMN tasks.from_canvas IS 'Indicates if the task was imported from 
 COMMENT ON COLUMN tasks.canvas_assignment_id IS 'The Canvas assignment ID for imported assignments';
 COMMENT ON COLUMN tasks.canvas_html_url IS 'URL to view the assignment in Canvas';
 COMMENT ON COLUMN tasks.submission_types IS 'Types of submissions accepted for this assignment';
+
