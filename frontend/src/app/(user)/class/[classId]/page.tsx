@@ -20,6 +20,7 @@ export default function ClassDetailsPage() {
   const [classDetails, setClassDetails] = useState<ClassData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   // --- Add Resource State ---
   const [resources, setResources] = useState<ResourceInfo[]>([]);
@@ -80,6 +81,28 @@ export default function ClassDetailsPage() {
     }
   };
 
+  // Function to verify if user is associated with the class
+  const verifyClassAssociation = async (userId: string) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/check-access/${userId}`
+      );
+      
+      if (!response.ok) {
+        if (response.status === 403) {
+          return false;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.has_access;
+    } catch (err) {
+      console.error("Failed to verify class association:", err);
+      return false;
+    }
+  };
+
   // --- Fetch Class Details Effect ---
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -87,7 +110,19 @@ export default function ClassDetailsPage() {
         setUser(currentUser);
         if (classId) {
           try {
-            setIsLoading(true); // Set loading true before fetch
+            setIsLoading(true);
+            
+            // First verify if user is associated with the class
+            const isAssociated = await verifyClassAssociation(currentUser.uid);
+            if (!isAssociated) {
+              setError("You do not have permission to view this class.");
+              setClassDetails(null);
+              setIsAuthorized(false);
+              setIsLoading(false);
+              return;
+            }
+            setIsAuthorized(true);
+
             const response = await fetch(
               `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}`
             );
@@ -98,17 +133,11 @@ export default function ClassDetailsPage() {
               } else {
                 throw new Error(`HTTP error! status: ${response.status}`);
               }
-              setClassDetails(null); // Clear details on error
+              setClassDetails(null);
             } else {
               const data: ClassData = await response.json();
-              // Optional: Check if fetched class belongs to the logged-in user if needed
-              // if (data.user_id !== currentUser.uid) {
-              //     setError("You do not have permission to view this class.");
-              //     setClassDetails(null);
-              // } else {
               setClassDetails(data);
-              setError(null); // Clear error on success
-              // }
+              setError(null);
             }
           } catch (err: any) {
             console.error("Failed to fetch class details:", err);
@@ -118,15 +147,13 @@ export default function ClassDetailsPage() {
             setIsLoading(false);
           }
         } else {
-          // Handle case where classId is missing or invalid
           setError("Invalid Class ID.");
           setIsLoading(false);
         }
       } else {
-        // Not logged in
         setUser(null);
         setIsLoading(false);
-        router.push("/"); // Redirect to home
+        router.push("/");
       }
     });
 
@@ -333,6 +360,21 @@ export default function ClassDetailsPage() {
   const handleCancelCreation = () => {
     setShowCreateResourceModal(false);
   };
+
+  // Add early return if not authorized
+  if (!isAuthorized && !isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+          <p className="text-gray-600">{error}</p>
+          <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">
+            Return to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   //  Combined Loading State
   // Show loading if class details are loading OR resources are loading

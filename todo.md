@@ -6,7 +6,7 @@
 
 - [x] @naman : progress on canvas infrastructure: done
 
-- [ ] @som: Investigation: I have a class with a certain id that ONLY I should be able to access. however, if another user goes to http://localhost:3000/class/450a84f5-5480-4d94-b1e5-46da244e53d4 , they can access my class. Fix this. (need to secure end point by sending google_id and checking if user's google_id is same as the google_id trying to access resource)
+- [x] @som: Investigation: I have a class with a certain id that ONLY I should be able to access. however, if another user goes to http://localhost:3000/class/450a84f5-5480-4d94-b1e5-46da244e53d4 , they can access my class. Fix this. (need to secure end point by sending google_id and checking if user's google_id is same as the google_id trying to access resource)
 
 - [ ] @both: overwrite the default 404 error page (figure out how to do this), and make it fit stylistically with the rest of the app
 
@@ -16,9 +16,9 @@
 
 - [ ] @both: CLEAR UI/UX and Branding. the color theme needs to be solidified, logo needs to be redone.
 
-- [ ] : @som: once you complete onboarding to make sur eyou understand the whole application structure now, go to backend/routes.md and make sure you understand how everything works.
+- [x] : @som: once you complete onboarding to make sur eyou understand the whole application structure now, go to backend/routes.md and make sure you understand how everything works.
 
-- [ ] - @Som: go to frontend/app/(user)/resources/[id]/page.tsx - implement functionality for user to be able to create and view flashcards based on a text input box where the user can input CSV values for question, answer; and user should be able to UPDATE the resource, and then implement an 'ask ai' button, which is a simple chat api call which includes the current csv text content notes (stored as JSONB) and gives it to chat, asks to generate MORE flashcards in the same JSONB format inputted and then displays it on the frontend
+- [x] - @Som: go to frontend/app/(user)/resources/[id]/page.tsx - implement functionality for user to be able to create and view flashcards based on a text input box where the user can input CSV values for question, answer; and user should be able to UPDATE the resource, and then implement an 'ask ai' button, which is a simple chat api call which includes the current csv text content notes (stored as JSONB) and gives it to chat, asks to generate MORE flashcards in the same JSONB format inputted and then displays it on the frontend
 
 - [ ]: @som figure out layout and only make the navbar show on the / and /profile directory (only in the files in the (landing) folder without making layout a client side component (which means we cannot export metadata))
 

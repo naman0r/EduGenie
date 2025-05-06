@@ -119,3 +119,17 @@ def add_classes_batch():
     except Exception as e:
         logger.exception(f"Error processing batch class add for google_id {google_id}: {e}")
         return jsonify({"error": "An unexpected server error occurred"}), 500 
+
+@bp.route('/classes/<string:class_id>/check-access/<string:google_id>', methods=['GET'])
+def check_class_access(class_id, google_id):
+    try:
+        # Check if the class exists and belongs to the user
+        resp = supabase.table("classes").select("id").eq("id", class_id).eq("user_id", google_id).maybe_single().execute()
+        
+        if not resp.data:
+            return jsonify({"has_access": False}), 403
+        
+        return jsonify({"has_access": True}), 200
+    except Exception as e:
+        logger.error(f"Error checking class access: {e}")
+        abort(500, description=str(e)) 
