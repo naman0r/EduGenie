@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TextNoteEditor from "@/components/TextNoteEditor";
 import MindmapDisplay from "@/components/MindmapDisplay";
+import FlashcardEditor from "@/components/FlashcardEditor";
 import { ResourceInfo } from "@/types/resources";
 
 // Define a more specific type for the fetched resource, including content
@@ -128,19 +129,24 @@ const ResourceDetailPage = () => {
           userId={userId}
         />
       ) : resource.type === "Mindmap" && userId ? (
-        <MindmapDisplay // Use the Wrapper component
+        <MindmapDisplay
           initialNodes={resource.content?.nodes || []}
           initialEdges={resource.content?.edges || []}
           resourceId={resource.id}
         />
+      ) : resource.type === "flashcards" && userId ? (
+        <FlashcardEditor
+          initialContent={resource.content || { cards: [] }}
+          resourceId={resource.id}
+          userId={userId}
+        />
       ) : (
-        // for now just showing the json content of the flashcard resource (creating a blank content JSONB field, cannot be edited at the moment)
         <div className="mt-4 p-4 border border-gray-700 rounded-lg bg-gray-800/60">
           <h3 className="text-lg font-semibold mb-2">Resource Content</h3>
           <pre className="text-gray-300 whitespace-pre-wrap break-words">
             {JSON.stringify(resource.content, null, 2)}
           </pre>
-          {resource.type !== "Text notes" && resource.type !== "Mindmap" && (
+          {resource.type !== "Text notes" && resource.type !== "Mindmap" && resource.type !== "flashcards" && (
             <p className="mt-4 text-sm text-yellow-400">
               Display/Editing for '{resource.type}' type is not yet supported.
             </p>
