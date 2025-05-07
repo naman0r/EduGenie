@@ -1,5 +1,9 @@
 # Assignment tracking for EduGenie
 
+- [ ] @som: rate limiting for the resource creation thing. \* work on branch feature/credits
+
+- [ ] @naman: rate limiting for canvas integration
+
 - [x] in this route : @bp.route('/canvas/connect', methods=['POST']) (canvas.py) we need to add validation for the url that the user inputs. eg: we need to make sure it is https:// preceeding and also has a / at the end of it.
 
 - [ ] @naman: implementing credits thing, revenueCat for payments
