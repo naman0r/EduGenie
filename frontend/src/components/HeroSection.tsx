@@ -104,7 +104,7 @@ const HeroSection = () => {
           maxSize={1.5}
           particleDensity={200}
           className="w-full h-full"
-          particleColor="#05ff71"
+          particleColor="#707175"
           //particleColor="#26d0ff"
         />
       </div>

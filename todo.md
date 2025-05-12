@@ -2,11 +2,11 @@
 
 - [ ] @som: rate limiting for the resource creation thing. \* work on branch feature/credits
 
-- [ ] @naman: rate limiting for canvas integration
+- [x] @naman: rate limiting for canvas integration and google calendar integration initiation
 
 - [x] in this route : @bp.route('/canvas/connect', methods=['POST']) (canvas.py) we need to add validation for the url that the user inputs. eg: we need to make sure it is https:// preceeding and also has a / at the end of it.
 
-- [ ] @naman: implementing credits thing, revenueCat for payments
+- [x] @naman: implementing credits thing, revenueCat for payments
 
 - [x] @naman : progress on canvas infrastructure: done
 

@@ -275,6 +275,16 @@ export default function ProfilePage() {
   // Function to initiate Google Calendar connection
   const connectGoogleCalendar = () => {
     if (user && user.uid) {
+      fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/credits/${user.uid}/add_credits`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amount: -2 }),
+        }
+      );
       // Redirect to the backend initiation endpoint
       window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google/calendar/initiate?google_id=${user.uid}`;
     } else {
@@ -351,6 +361,16 @@ export default function ProfilePage() {
   // Function to initiate Canvas connection redirect
   const initiateCanvasConnection = () => {
     if (user && user.uid) {
+      fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/credits/${user.uid}/add_credits`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amount: -2 }),
+        }
+      );
       router.push(`/connect/canvas?google_id=${user.uid}`);
     } else {
       setError("You must be logged in to connect Canvas.");
