@@ -48,8 +48,14 @@ except Exception as e:
     raise
 
 app = Flask(__name__)
-# Allow requests from the frontend origin, support credentials, and allow Content-Type and Authorization headers
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True, allow_headers=["Content-Type", "Authorization"])
+# Configure CORS - Updated to allow X-Google-ID
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},  # Allow all origins for now (adjust for production)
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"], # Ensure OPTIONS is allowed for preflight
+    expose_headers=["Content-Type", "X-Google-ID"], # Allow frontend to read this if needed (might not be strictly necessary but good practice)
+    allow_headers=["Content-Type", "Authorization", "X-Google-ID"] # Crucially allow this header to be sent
+)
 
 # Register blueprints
 app.register_blueprint(auth_bp)

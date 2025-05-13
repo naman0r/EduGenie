@@ -1,5 +1,12 @@
 # Assignment tracking for EduGenie
 
+## Priority 1:
+
+- [ ] @ both: add JWT tokenization to properly secure the backend
+- [ ] @ both: how do we secure the frontend? storing the googleid in localstorage as the only measure of security is a bad idea.
+- [ ] @som: pls figure out how to remove the stupid topnav in all the (user) pages.
+      #--
+
 - [ ] @som: rate limiting for the resource creation thing. \* work on branch feature/credits
 
 - [x] @naman: rate limiting for canvas integration and google calendar integration initiation
