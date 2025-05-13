@@ -93,3 +93,5 @@ Documentation for all the backend routes, keep updating as new routes are added.
 
 - `POST /chat/generate-video`
   - Initiates AI video generation based on a provided text prompt. The process involves script generation, TTS audio creation, and video rendering with captions. Returns a URL to the statically served MP4 video file upon completion. Expects `text` in the request body.
+
+## Genie (`genie.py`)
