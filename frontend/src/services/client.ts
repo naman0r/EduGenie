@@ -19,19 +19,31 @@ export async function fetchAPI(url: string, options: RequestInit = {}) {
   const response = await fetch(url, config);
 
   if (!response.ok) {
-    let errorData;
+    let errorPayload = { message: `HTTP error! status: ${response.status}` }; // Default error
     try {
-      errorData = await response.json();
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const jsonError = await response.json();
+        // Use a more specific message from JSON error if available
+        errorPayload = {
+          message:
+            jsonError.detail || jsonError.message || JSON.stringify(jsonError),
+        };
+      } else {
+        // If not JSON, try to get text, but be mindful of empty responses
+        const textError = await response.text();
+        if (textError) {
+          errorPayload = { message: textError };
+        }
+        // If textError is also empty, the default message is used
+      }
     } catch (e) {
-      errorData = { message: await response.text() };
+      // This catch is for if .json() or .text() itself throws an error (e.g. network issue during parsing)
+      // The initial default errorPayload is likely sufficient here, or log this specific parsing error.
+      console.error("Error parsing error response body:", e);
     }
-    console.error("API Error:", response.status, errorData);
-    const error = new Error(
-      errorData.message || `HTTP error! status: ${response.status}`
-    );
-    // You could attach more info to the error object if needed
-    // (error as any).status = response.status;
-    // (error as any).data = errorData;
+    console.error("API Error:", response.status, errorPayload.message);
+    const error = new Error(errorPayload.message);
     throw error;
   }
 

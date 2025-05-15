@@ -10,8 +10,8 @@ export const initiateGoogleCalendarAuth = (googleId: string): void => {
 interface CalendarEventData {
   summary: string;
   description: string;
-  start: { dateTime: string; timeZone: string };
-  end: { dateTime: string; timeZone: string };
+  start_datetime: string;
+  end_datetime: string;
 }
 
 export const createGoogleCalendarTestEvent = async (

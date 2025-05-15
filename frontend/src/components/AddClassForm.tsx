@@ -2,95 +2,83 @@
 
 import React, { useState } from "react";
 
-// Define the shape of the class data being created (matches backend ClassCreate)
-interface ClassFormData {
+// Payload for creating a class
+interface AddClassPayload {
+  // Renamed from ClassFormData
   name: string;
   code?: string;
   instructor?: string;
 }
 
-// Define the shape of the created class data returned from backend (matches backend ClassInfo)
-interface CreatedClassData {
-  id: string; // Assuming UUID comes as string
-  user_id: string;
-  name: string;
-  code?: string | null;
-  instructor?: string | null;
-  created_at: string; // Assuming timestamp comes as string
-}
+// CreatedClassData interface removed as it's no longer handled here
 
 interface AddClassFormProps {
-  userId: string; // Pass the google_id of the logged-in user
-  onClassAdded: (newClass: CreatedClassData) => void; // Callback after successful creation
-  onCancel: () => void; // Callback to hide the form
+  // userId prop removed
+  // onClassAdded prop removed
+  onSubmitClass: (classDetails: AddClassPayload) => Promise<void>; // New prop for submission logic
+  onCancel: () => void;
+  formError?: string | null; // Optional: To display errors from parent submission call
 }
 
 const AddClassForm: React.FC<AddClassFormProps> = ({
-  userId,
-  onClassAdded,
+  onSubmitClass, // Destructure new prop
   onCancel,
+  formError, // Destructure new prop
 }) => {
-  const [formData, setFormData] = useState<ClassFormData>({ name: "" });
+  const [formData, setFormData] = useState<AddClassPayload>({ name: "" }); // Use AddClassPayload
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null); // Renamed error to validationError for clarity
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value || undefined, // Store empty optional fields as undefined
+      // Store empty optional fields as undefined, or trim non-empty ones
+      [name]: value.trim() === "" ? undefined : value,
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setError("Class Name is required.");
+    if (!formData.name || !formData.name.trim()) {
+      // Ensure name is not just spaces
+      setValidationError("Class Name is required.");
       return;
     }
+    setValidationError(null); // Clear local validation error
 
     setIsLoading(true);
-    setError(null);
+
+    // Prepare data for submission, ensuring name is trimmed
+    // Optional fields are already handled by handleInputChange to be undefined if empty
+    const submissionData: AddClassPayload = {
+      name: formData.name.trim(),
+      code: formData.code?.trim() || undefined, // Ensure empty strings become undefined
+      instructor: formData.instructor?.trim() || undefined, // Ensure empty strings become undefined
+    };
 
     try {
-      const response = await fetch(
-        `http://localhost:8000/users/${userId}/classes`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          // Send only non-empty optional fields
-          body: JSON.stringify({
-            name: formData.name.trim(),
-            ...(formData.code?.trim() && { code: formData.code.trim() }),
-            ...(formData.instructor?.trim() && {
-              instructor: formData.instructor.trim(),
-            }),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ detail: "Failed to add class. Please try again." }));
-        throw new Error(
-          errorData.detail || `HTTP error! status: ${response.status}`
-        );
-      }
-
-      const newClass: CreatedClassData = await response.json();
-      onClassAdded(newClass); // Pass the new class data back to the parent
-      // Optionally reset form or just rely on parent hiding it
-      // setFormData({ name: '' });
+      await onSubmitClass(submissionData); // Call the passed-in submission handler
+      // onCancel(); // The parent (DashboardPage) closes the form on successful addClass context call.
+      // If not, onCancel can be called here too. Dashboard already hides it.
     } catch (err: any) {
-      console.error("Failed to add class:", err);
-      setError(err.message || "An unexpected error occurred.");
+      // Error is now handled by DashboardPage which passes it via formError prop if needed.
+      // This component doesn't need to set its own error state from the submission promise,
+      // as DashboardPage will re-render it with the formError prop.
+      // However, logging it here can be useful for debugging during development.
+      console.error(
+        "AddClassForm: onSubmitClass failed internally within AddClassForm scope (should be caught by parent):",
+        err
+      );
+      // If onSubmitClass throws, isLoading might need to be reset if not unmounted.
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Reset loading state regardless of success/failure of the passed function
+      // Parent component (DashboardPage) will handle UI changes based on the promise outcome of addClass
     }
   };
+
+  // Determine which error to display: parent's error takes precedence
+  const displayError = formError || validationError;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4 transition-opacity duration-300 ease-in-out">
@@ -157,7 +145,9 @@ const AddClassForm: React.FC<AddClassFormProps> = ({
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {displayError && (
+            <p className="text-red-500 text-sm">{displayError}</p>
+          )}
 
           <div className="flex justify-end space-x-3 pt-3">
             <button
