@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
 import Head from "next/head"; // Keep Head import if used elsewhere, or remove
+import { AuthProvider } from "@/context/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// cannot have meta data in a client component
+// cannot have meta data in a client component if the component itself becomes client-side
+// If AuthProvider makes RootLayout effectively client-side, this metadata might need adjustment
+// or to be handled at the page level for static pages.
 export const metadata: Metadata = {
   title: "EduGenie",
   description: "AI for all your educational needs",
@@ -31,10 +34,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="relative w-full flex items-center justify-center">
-          {<NavBar />}
-        </div>
-        {children}
+        <AuthProvider>
+          <div className="relative w-full flex items-center justify-center">
+            {<NavBar />}
+          </div>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
