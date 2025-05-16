@@ -15,6 +15,45 @@ class ClassCreate(BaseModel):
     name: str
     code: Optional[str] = None
     instructor: Optional[str] = None
+    
+
+@bp.route('/users/<string:google_id>/classes', methods=['DELETE'])
+def delete_class(google_id): 
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        class_id = data.get("class_id")
+        user_id = data.get("user_id")
+        
+        if not class_id or not user_id:
+            return jsonify({"error": "class_id and user_id are required"}), 400
+        
+        if google_id != user_id:
+            return jsonify({"error": "You do not have access to delete this class"}), 403
+        
+        # First check if the class exists
+        check_resp = supabase.table("classes").select("id").eq('id', class_id).eq('user_id', user_id).execute()
+        
+        if not check_resp.data:
+            return jsonify({"error": "Class not found"}), 404
+            
+        # If class exists, proceed with deletion
+        resp = supabase.table("classes").delete().eq('user_id', user_id).eq('id', class_id).execute()
+        
+        # Supabase returns an empty list on successful deletion
+        if resp.data is not None:  # Changed from checking resp.error
+            return jsonify({"message": "Class deleted successfully"}), 200
+        else:
+            return jsonify({'error': 'Could not delete class'}), 500
+        
+    except Exception as e:
+        logger.error(f"Error deleting class: {str(e)}")
+        return jsonify({"error": "An error occurred while deleting the class"}), 500
+        
+        
+
 
 @bp.route('/users/<string:google_id>/classes', methods=['GET'])
 def get_user_classes(google_id):

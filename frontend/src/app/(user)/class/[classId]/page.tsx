@@ -10,6 +10,7 @@ import { Task } from "@/types/task";
 import { ClassData } from "@/types/class";
 import TaskCard from "@/components/TaskCard";
 import CanvasAssignmentsModal from "@/components/CanvasAssignmentsModal";
+import { deleteClass } from "@/services/classes";
 
 export default function ClassDetailsPage() {
   const params = useParams();
@@ -51,6 +52,10 @@ export default function ClassDetailsPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   // We don't need showResourceOptions anymore as it was replaced by the modal logic
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) setSelectedFile(e.target.files[0]);
   };
@@ -87,14 +92,14 @@ export default function ClassDetailsPage() {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/check-access/${userId}`
       );
-      
+
       if (!response.ok) {
         if (response.status === 403) {
           return false;
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return data.has_access;
     } catch (err) {
@@ -111,7 +116,7 @@ export default function ClassDetailsPage() {
         if (classId) {
           try {
             setIsLoading(true);
-            
+
             // First verify if user is associated with the class
             const isAssociated = await verifyClassAssociation(currentUser.uid);
             if (!isAssociated) {
@@ -361,14 +366,40 @@ export default function ClassDetailsPage() {
     setShowCreateResourceModal(false);
   };
 
+  // Add delete handler
+  const handleDeleteClass = async () => {
+    if (!user || !classId) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await deleteClass(user.uid, classId);
+      router.push("/dashboard");
+      router.refresh(); // Refresh the dashboard page to reflect the deleted class.
+    } catch (err: any) {
+      console.error("Failed to delete class:", err);
+      setDeleteError(
+        err.message || "Failed to delete class. Please try again."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Add early return if not authorized
   if (!isAuthorized && !isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h1>
           <p className="text-gray-600">{error}</p>
-          <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">
+          <Link
+            href="/"
+            className="mt-4 inline-block text-blue-600 hover:underline"
+          >
             Return to Home
           </Link>
         </div>
@@ -418,23 +449,53 @@ export default function ClassDetailsPage() {
 
   return (
     <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16">
-      {/* Header with Class Name */}
+      {/* Header with Class Name and Delete Button */}
       <div className="mb-8 border-b border-gray-700 pb-4">
-        <h1 className="text-3xl font-bold truncate" title={classDetails.name}>
-          {classDetails.name}
-        </h1>
-        <div className="flex space-x-4 text-sm text-gray-400 mt-2">
-          {classDetails.code && (
-            <span>
-              Code: <span className="text-indigo-300">{classDetails.code}</span>
-            </span>
-          )}
-          {classDetails.instructor && (
-            <span>
-              Instructor:{" "}
-              <span className="text-gray-300">{classDetails.instructor}</span>
-            </span>
-          )}
+        <div className="flex justify-between items-start">
+          <div>
+            <h1
+              className="text-3xl font-bold truncate"
+              title={classDetails.name}
+            >
+              {classDetails.name}
+            </h1>
+            <div className="flex space-x-4 text-sm text-gray-400 mt-2">
+              {classDetails.code && (
+                <span>
+                  Code:{" "}
+                  <span className="text-indigo-300">{classDetails.code}</span>
+                </span>
+              )}
+              {classDetails.instructor && (
+                <span>
+                  Instructor:{" "}
+                  <span className="text-gray-300">
+                    {classDetails.instructor}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="p-2 text-red-500 hover:text-red-600 transition-colors"
+            title="Delete Class"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -675,6 +736,51 @@ export default function ClassDetailsPage() {
 
       {/* Display Class ID for reference */}
       <p className="text-xs text-gray-600 mt-10">Class ID: {classDetails.id}</p>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-4 rounded-lg shadow-xl w-[300px]">
+            <div className="flex items-center gap-3 mb-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 text-red-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <h3 className="text-lg font-medium">Delete Class</h3>
+            </div>
+            <p className="text-sm text-gray-300 mb-4">
+              This action cannot be undone.
+            </p>
+            {deleteError && (
+              <p className="text-sm text-red-500 mb-3">{deleteError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-3 py-1.5 text-sm text-gray-300 hover:text-white transition-colors"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteClass}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

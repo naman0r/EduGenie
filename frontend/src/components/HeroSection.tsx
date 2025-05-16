@@ -108,6 +108,7 @@ const HeroSection = () => {
           //particleColor="#26d0ff"
         />
       </div>
+      {/* idea: it's not just about studying, it's about learning while building monentum. Start building momentum right now. */}
 
       <div className="relative z-10 flex flex-col items-center justify-center text-center pt-35">
         <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400 mb-4 font-mono">

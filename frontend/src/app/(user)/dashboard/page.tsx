@@ -6,6 +6,7 @@ import AddClassForm from "@/components/AddClassForm";
 import Link from "next/link";
 import { ClassData } from "@/types/class";
 import { useAuth } from "@/context/AuthContext";
+import { deleteClass } from "@/services/classes";
 
 // Define the payload structure AddClassForm will provide, matching AuthContext's addClass
 interface AddClassFormPayload {

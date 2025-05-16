@@ -14,3 +14,9 @@ export interface MindmapContent {}
 export interface NoteContent {}
 
 export interface FlashcardContent {}
+
+export interface CreateResourcePayload {
+  type: string;
+  name: string;
+  content?: Record<string, any>; // Optional, as some resources might be created with default/empty content
+}
