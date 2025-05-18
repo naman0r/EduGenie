@@ -1,8 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation"; // Import useSearchParams
-import { auth, signOut } from "@/utils/firebase"; // Import signOut
+import { signOut as firebaseSignOut, auth } from "@/utils/firebase"; // Renamed signOut to avoid conflict
+import { useAuth } from "@/context/AuthContext";
+import {
+  updateUserProfile,
+  initiateGoogleCalendarAuth,
+  createGoogleCalendarTestEvent,
+  connectCanvas as connectCanvasService, // Aliased to avoid conflict
+  disconnectCanvas as disconnectCanvasService, // Aliased to avoid conflict
+} from "@/services";
+import { UserProfileUpdateData, UserProfile as UserProfileType } from "@/types"; // Explicitly import UserProfileType
 
 // Define the structure of the user profile data
 interface UserProfile {
@@ -35,431 +44,263 @@ const academicLevels = [
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams(); // Hook to read query params
-  const [user, setUser] = useState<any | null>(null); // Firebase user object
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    firebaseUser,
+    userProfile,
+    credits,
+    isLoading: authLoading, // Renamed to avoid conflict with local isLoading
+    authError,
+    refreshData,
+  } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState<Partial<UserProfileUpdateData>>({});
+
+  // Page-specific loading states
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isCreatingTestEvent, setIsCreatingTestEvent] = useState(false);
+  const [isDisconnectingCanvas, setIsDisconnectingCanvas] = useState(false);
+  const [isConnectingCanvas, setIsConnectingCanvas] = useState(false); // Added for Canvas connection initiation
+
+  // Page-specific error/status messages
+  const [pageError, setPageError] = useState<string | null>(null);
   const [calendarStatusMessage, setCalendarStatusMessage] = useState<
     string | null
   >(null);
-  const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [testEventFeedback, setTestEventFeedback] = useState<string | null>(
     null
   );
-  const [isCreatingTestEvent, setIsCreatingTestEvent] = useState(false);
-
-  // Form state for editing
-  const [formData, setFormData] = useState<Partial<UserProfile>>({
-    full_name: "",
-    academic_year: undefined, // Use undefined for optional number
-    academic_level: "",
-    institution: "",
-  });
-
-  // Canvas Integration State
-  const [isCanvasConnected, setIsCanvasConnected] = useState(false);
   const [canvasStatusMessage, setCanvasStatusMessage] = useState<string | null>(
     null
   );
-  const [isDisconnectingCanvas, setIsDisconnectingCanvas] = useState(false);
 
-  const [credits, setCredits] = useState<number>(0);
+  // Derived states for connection status (from userProfile)
+  const isCalendarConnected = !!userProfile?.google_refresh_token;
+  const isCanvasConnected = !!userProfile?.canvas_domain;
 
+  // Effect to initialize formData when userProfile or firebaseUser loads or changes
   useEffect(() => {
-    const handleCreditLoading = async () => {
-      const google_id = localStorage.getItem("google_id");
-      try {
-        console.log("fetching credits for user");
-
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/credits/${google_id}/get_credits`,
-          {
-            method: "GET",
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch credits");
-        }
-
-        const data = await response.json();
-        setCredits(data.credits);
-      } catch (error) {
-        console.error("Error fetching credits:", error);
+    if (userProfile) {
+      setFormData({
+        full_name: userProfile.full_name || firebaseUser?.displayName || "",
+        academic_year: userProfile.academic_year || undefined,
+        academic_level: userProfile.academic_level || "",
+        institution: userProfile.institution || "",
+      });
+      if (!userProfile.full_name && firebaseUser?.displayName) {
+        // If profile exists but name is empty, and firebase has a display name, prefill and suggest editing
+        setIsEditing(true);
       }
-    };
-    handleCreditLoading();
-  }, []);
+    } else if (firebaseUser && !authLoading && !userProfile) {
+      // New user or profile not yet created, prefill from Firebase and start editing
+      setFormData({
+        full_name: firebaseUser.displayName || "",
+        academic_year: undefined,
+        academic_level: "",
+        institution: "",
+      });
+      setIsEditing(true);
+      setPageError("Profile not found. Please complete your profile."); // Inform user
+    }
+  }, [userProfile, firebaseUser, authLoading]);
 
-  // Effect to check auth state and fetch profile
+  // Effect to handle redirect if not authenticated
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        // Fetch profile data from backend
-        try {
-          // Use google_id (currentUser.uid from Firebase often matches google_id)
-          const googleId = currentUser.uid;
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${googleId}`
-          ); // Use google_id in URL
+    if (!authLoading && !firebaseUser) {
+      router.push("/");
+    }
+  }, [authLoading, firebaseUser, router]);
 
-          if (!response.ok) {
-            if (response.status === 404) {
-              setError("Profile not found. Please complete your profile.");
-              // Initialize form data for a new profile
-              setFormData({
-                full_name: currentUser.displayName || "",
-                email: currentUser.email || "",
-                academic_year: undefined,
-                academic_level: "",
-                institution: "",
-              });
-              setIsEditing(true); // Start in editing mode for new users
-            } else {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            setProfile(null); // Ensure profile is null on error
-          } else {
-            const data = await response.json();
-            const userProfile: UserProfile = data.user;
-            setProfile(userProfile);
-            // Initialize form data with fetched profile
-            setFormData({
-              full_name: userProfile.full_name || "",
-              academic_year: userProfile.academic_year || undefined,
-              academic_level: userProfile.academic_level || "",
-              institution: userProfile.institution || "",
-            });
-            // Check if calendar is already connected based on refresh token presence
-            setIsCalendarConnected(!!userProfile.google_refresh_token);
-            // Check if Canvas is already connected based on domain presence
-            setIsCanvasConnected(!!userProfile.canvas_domain); // Check canvas connection
-            setError(null); // Clear previous errors
-          }
-        } catch (err) {
-          console.error("Failed to fetch profile:", err);
-          setError("Failed to load profile data. Please try again later.");
-          setProfile(null);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        // Not logged in, redirect to home or login page
-        setUser(null);
-        setProfile(null);
-        setIsLoading(false);
-        router.push("/"); // Redirect to home page if not logged in
-      }
-    });
-
-    // Check for Google Calendar auth status from query params ONCE on mount
-    const status = searchParams.get("google_auth_status");
-    if (status) {
-      if (status === "success") {
+  // Effect for handling query params for Calendar and Canvas connection status
+  useEffect(() => {
+    const googleAuthStatus = searchParams.get("google_auth_status");
+    if (googleAuthStatus) {
+      if (googleAuthStatus === "success") {
         setCalendarStatusMessage("Google Calendar connected successfully!");
-        setIsCalendarConnected(true); // Assume connection if success param is present
-      } else if (status === "error_saving") {
+        refreshData(); // Refresh data to get new token status
+      } else {
         setCalendarStatusMessage(
-          "Failed to save Google Calendar connection. Please try again."
-        );
-      } else if (status === "callback_failed") {
-        setCalendarStatusMessage(
-          "Google Calendar connection failed. Please try again."
+          "Google Calendar connection failed or was cancelled. Please try again."
         );
       }
-      // Clean the URL (optional, requires navigation)
-      // router.replace('/profile', { scroll: false });
+      router.replace("/profile", { scroll: false }); // Clean URL
     }
 
-    // Check for Canvas auth status from query params
-    const canvasStatus = searchParams.get("canvas_auth_status");
-    if (canvasStatus) {
-      if (canvasStatus === "success") {
+    const canvasAuthStatus = searchParams.get("canvas_auth_status");
+    if (canvasAuthStatus) {
+      if (canvasAuthStatus === "success") {
         setCanvasStatusMessage("Canvas account connected successfully!");
-        setIsCanvasConnected(true); // Assume connection if success param is present
-      } else if (canvasStatus === "error") {
+        refreshData(); // Refresh data to get new canvas status
+      } else {
         setCanvasStatusMessage(
-          "Failed to connect Canvas account. Please check credentials and try again."
-        );
-      } else if (canvasStatus === "error_saving") {
-        setCanvasStatusMessage(
-          "Failed to save Canvas connection. Please try again."
+          "Failed to connect Canvas account. Please ensure credentials are correct and try again."
         );
       }
-      // Clean the URL (optional, requires navigation)
-      // router.replace('/profile', { scroll: false });
+      router.replace("/profile", { scroll: false }); // Clean URL
     }
+  }, [searchParams, router, refreshData]);
 
-    return () => unsubscribe(); // Cleanup subscription on unmount
-  }, [router, searchParams]);
-
-  // Handle form input changes
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]:
-        type === "number"
-          ? value === ""
-            ? undefined
-            : parseInt(value, 10)
-          : value,
-    }));
+    const { name, value } = e.target;
+    const val =
+      e.target.type === "number"
+        ? value === ""
+          ? undefined
+          : parseInt(value, 10)
+        : value;
+    setFormData((prev) => ({ ...prev, [name]: val }));
   };
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !user.uid) {
-      setError("User not authenticated.");
+    if (!firebaseUser) {
+      setPageError("User not authenticated.");
       return;
     }
-
-    setIsLoading(true); // Show loading state during submission
-    setError(null);
-
+    setIsSubmittingProfile(true);
+    setPageError(null);
     try {
-      const googleId = user.uid;
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${googleId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            // No Authorization header needed for now
-          },
-          body: JSON.stringify(formData), // Send only updated fields
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const updatedData = await response.json();
-      setProfile(updatedData.user); // Update local profile state
-      // Re-initialize form data in case PUT returns the full updated object
-      setFormData({
-        full_name: updatedData.user.full_name || "",
-        academic_year: updatedData.user.academic_year || undefined,
-        academic_level: updatedData.user.academic_level || "",
-        institution: updatedData.user.institution || "",
-      });
-      setIsEditing(false); // Exit editing mode after successful save
-      alert("Profile updated successfully!"); // Simple success feedback
-    } catch (err) {
+      await updateUserProfile(firebaseUser.uid, formData);
+      await refreshData(); // Refresh context data
+      setIsEditing(false);
+      // Optionally show a success message
+    } catch (err: any) {
       console.error("Failed to update profile:", err);
-      setError("Failed to update profile. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Add handleLogout function
-  const handleLogout = async () => {
-    setError(null);
-    try {
-      await signOut(auth);
-      // No need to setUser(null) here, onAuthStateChanged will trigger redirect
-      // router.push('/'); // onAuthStateChanged handles the redirect
-    } catch (error: any) {
-      console.error("Logout Error:", error);
-      setError("Failed to logout. Please try again.");
-    }
-  };
-
-  // Function to initiate Google Calendar connection
-  const connectGoogleCalendar = () => {
-    if (user && user.uid) {
-      fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/credits/${user.uid}/add_credits`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ amount: -2 }),
-        }
+      setPageError(
+        err.message || "Failed to update profile. Please try again."
       );
-      // Redirect to the backend initiation endpoint
-      window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google/calendar/initiate?google_id=${user.uid}`;
-    } else {
-      setError("You must be logged in to connect Google Calendar.");
+    } finally {
+      setIsSubmittingProfile(false);
     }
   };
 
-  // Function to create a test event
-  const handleCreateTestEvent = async () => {
-    if (!user || !user.uid) {
-      setTestEventFeedback("Error: Not logged in.");
-      return;
+  const handleLogout = async () => {
+    setPageError(null);
+    try {
+      await firebaseSignOut(auth);
+      // AuthContext will handle redirect and state clearing via onAuthStateChanged
+      // router.push("/"); // This redirect is now handled by the useEffect above
+    } catch (err: any) {
+      console.error("Logout Error:", err);
+      setPageError(err.message || "Failed to logout. Please try again.");
     }
-    if (!isCalendarConnected) {
-      setTestEventFeedback("Error: Google Calendar not connected.");
-      return;
-    }
+  };
 
+  const handleConnectGoogleCalendar = () => {
+    if (firebaseUser) {
+      setCalendarStatusMessage(null); // Clear previous messages
+      initiateGoogleCalendarAuth(firebaseUser.uid);
+      // The page will reload/redirect via backend to Google and then back here with query params
+    }
+  };
+
+  const handleCreateTestEvent = async () => {
+    if (!firebaseUser) {
+      setTestEventFeedback("User not authenticated.");
+      return;
+    }
     setIsCreatingTestEvent(true);
     setTestEventFeedback(null);
-
-    // Create dates for the next hour in ISO format
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Add 1 hour
-
-    // Format dates as ISO strings (required by Google Calendar API)
-    // Using toISOString() produces UTC time ('Z' suffix)
-    const startISO = startTime.toISOString();
-    const endISO = endTime.toISOString();
-
-    const eventData = {
-      summary: "EduGenie Test Event",
-      description: "This is a test event created from the EduGenie app.",
-      start_datetime: startISO,
-      end_datetime: endISO,
-    };
-
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${user.uid}/calendar/events`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(eventData),
-        }
+      const now = new Date();
+      const later = new Date(now.getTime() + 60 * 60 * 1000);
+      // Construct eventData with flat start_datetime and end_datetime
+      const eventData = {
+        summary: "Test Event from EduGenie",
+        description: "This is a test event from your EduGenie profile.",
+        start_datetime: now.toISOString(), // Use ISO string directly
+        end_datetime: later.toISOString(), // Use ISO string directly
+        // timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Backend might infer from ISO string or need it separately
+      };
+      const result = await createGoogleCalendarTestEvent(
+        firebaseUser.uid,
+        eventData
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.detail || `Failed to create event (HTTP ${response.status})`
-        );
-      }
-
-      console.log("Event creation response:", result);
       setTestEventFeedback(
-        `Success! Event '${result.event_details?.summary}' created. Check your Google Calendar.`
+        `Success! Event '${result?.summary || "Test Event"}' created.`
       );
-      // Optionally include link: result.event_details?.htmlLink
     } catch (err: any) {
-      console.error("Failed to create test event:", err);
-      setTestEventFeedback(`Error creating test event: ${err.message}`);
+      setTestEventFeedback(err.message || "Failed to create test event.");
     } finally {
       setIsCreatingTestEvent(false);
     }
   };
 
-  // Function to handle Canvas connection - REMOVED
-  // const handleConnectCanvas = async () => { ... };
-
-  // Function to initiate Canvas connection redirect
-  const initiateCanvasConnection = () => {
-    if (user && user.uid) {
-      fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/credits/${user.uid}/add_credits`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ amount: -2 }),
-        }
-      );
-      router.push(`/connect/canvas?google_id=${user.uid}`);
-    } else {
-      setError("You must be logged in to connect Canvas.");
+  const handleInitiateCanvasConnection = () => {
+    if (firebaseUser) {
+      setCanvasStatusMessage(null);
+      router.push(`/connect/canvas?google_id=${firebaseUser.uid}`);
     }
   };
 
-  // Function to disconnect Canvas
+  // Actual connection logic might be on a separate page or modal
+  // This is just a placeholder if you were to call it directly (not typical for OAuth like flows)
+  const connectToCanvas = async (domain: string, token: string) => {
+    if (!firebaseUser) return;
+    setIsConnectingCanvas(true);
+    setCanvasStatusMessage(null);
+    try {
+      await connectCanvasService(firebaseUser.uid, domain, token);
+      await refreshData();
+      setCanvasStatusMessage("Canvas connected successfully!");
+    } catch (err: any) {
+      setCanvasStatusMessage(err.message || "Failed to connect Canvas.");
+    } finally {
+      setIsConnectingCanvas(false);
+    }
+  };
+
   const handleDisconnectCanvas = async () => {
-    if (!user || !user.uid) {
-      setCanvasStatusMessage("Error: Not logged in.");
+    if (!firebaseUser) {
+      setCanvasStatusMessage("User not authenticated.");
       return;
     }
-
     setIsDisconnectingCanvas(true);
-    setCanvasStatusMessage(null); // Clear previous messages
-
+    setCanvasStatusMessage(null);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/canvas/connect`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            domain: null, // Send null to clear
-            access_token: null, // Send null to clear
-            google_id: user.uid,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-            `Failed to disconnect Canvas (HTTP ${response.status})`
-        );
-      }
-
-      // Success
-      setIsCanvasConnected(false); // Update connection state
-      setCanvasStatusMessage("Canvas account disconnected successfully!");
+      await disconnectCanvasService(firebaseUser.uid);
+      await refreshData(); // Refresh context to reflect disconnection
+      setCanvasStatusMessage("Canvas disconnected successfully.");
     } catch (err: any) {
       console.error("Failed to disconnect Canvas:", err);
-      setCanvasStatusMessage(`Error disconnecting Canvas: ${err.message}`);
-      // Keep isCanvasConnected true on error, as the disconnection failed
+      setCanvasStatusMessage(
+        err.message || "Failed to disconnect Canvas. Please try again."
+      );
     } finally {
       setIsDisconnectingCanvas(false);
     }
   };
 
-  // Render loading state
-  if (isLoading && !profile && !error) {
-    // Show loading only if no profile/error yet
+  // Overall loading state for the page, primarily driven by AuthContext
+  if (authLoading && !userProfile && !authError) {
     return (
       <div className="min-h-screen bg-black/[0.96] text-white flex justify-center items-center">
-        Loading profile...
+        <p>Loading profile...</p>
       </div>
     );
   }
 
-  // Render error state
-  if (error && !isEditing) {
-    // Show error only if not in forced editing mode for new user
-    return (
-      <div className="min-h-screen bg-black/[0.96] text-red-500 flex flex-col justify-center items-center p-8">
-        <p>{error}</p>
-        {/* Optionally provide a button to retry or go back */}
-        <button
-          onClick={() => window.location.reload()} // Simple retry
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
+  // If firebaseUser is null after loading, and no authError, it means user is logged out (redirect handled by useEffect)
+  // AuthError from context will be displayed, or pageError for page-specific issues.
+  const generalError = authError || pageError;
 
-  // Render profile display or edit form
+  // Determine if we should be in a state to force profile completion
+  const forceProfileCompletion =
+    firebaseUser && !userProfile && !authLoading && !isEditing;
+
   return (
     <div className="min-h-screen bg-black/[0.96] text-white px-4 md:px-8 lg:px-16 pb-20 pt-35">
       <h1 className="text-3xl font-bold mb-6 text-center">Your Profile</h1>
 
-      {/* Display Calendar Connection Status */}
+      {generalError && !isEditing && (
+        <div className="max-w-xl mx-auto mb-4 p-3 rounded text-center bg-red-800/70 text-red-100">
+          <p>{generalError}</p>
+        </div>
+      )}
       {calendarStatusMessage && (
         <div
-          className={`mb-4 p-3 rounded text-center ${
+          className={`max-w-xl mx-auto mb-4 p-3 rounded text-center ${
             calendarStatusMessage.includes("success")
               ? "bg-green-800/70 text-green-100"
               : "bg-red-800/70 text-red-100"
@@ -468,11 +309,9 @@ export default function ProfilePage() {
           {calendarStatusMessage}
         </div>
       )}
-
-      {/* Display Canvas Connection Status */}
       {canvasStatusMessage && (
         <div
-          className={`mb-4 p-3 rounded text-center ${
+          className={`max-w-xl mx-auto mb-4 p-3 rounded text-center ${
             canvasStatusMessage.includes("success")
               ? "bg-green-800/70 text-green-100"
               : "bg-red-800/70 text-red-100"
@@ -482,315 +321,286 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {isEditing || (error && profile === null) ? ( // Show form if editing or new user error
-        <form
-          onSubmit={handleSubmit}
-          className="max-w-xl mx-auto bg-gray-800/50 p-6 rounded-lg shadow-xl space-y-4"
-        >
-          {/* Display Email (Read-only) */}
-          <div className="mb-4">
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={user?.email || ""}
-              readOnly
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-400 focus:outline-none"
-            />
-          </div>
-          {/* Full Name */}
-          <div>
-            <label
-              htmlFor="full_name"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Full Name
-            </label>
-            <input
-              type="text"
-              id="full_name"
-              name="full_name"
-              value={formData.full_name || ""}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-              placeholder="Your Full Name"
-            />
-          </div>
-          {/* Academic Year */}
-          <div>
-            <label
-              htmlFor="academic_year"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Academic Year / Grade
-            </label>
-            <input
-              type="number"
-              id="academic_year"
-              name="academic_year"
-              value={formData.academic_year || ""} // Handle potential null/undefined
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-              placeholder="e.g., 1, 2, 11, 12"
-            />
-          </div>
-          {/* Academic Level */}
-          <div>
-            <label
-              htmlFor="academic_level"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Academic Level
-            </label>
-            <select
-              id="academic_level"
-              name="academic_level"
-              value={formData.academic_level || ""}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-            >
-              <option value="" disabled>
-                Select Level
-              </option>
-              {academicLevels.map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
-          </div>
-          {/* Institution */}
-          <div>
-            <label
-              htmlFor="institution"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              School / University
-            </label>
-            <input
-              type="text"
-              id="institution"
-              name="institution"
-              value={formData.institution || ""}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-              placeholder="Name of your institution"
-            />
-          </div>
-          {/* Display Plan Type (Read-only) */}
-          {profile && profile.plan_type && (
-            <div className="mb-4">
+      {/* Main Content Area: Form or Display View */}
+      <div className="max-w-xl mx-auto bg-gray-800/70 p-6 rounded-lg shadow-xl">
+        {isEditing || forceProfileCompletion ? (
+          <form onSubmit={handleSubmitProfile} className="space-y-4">
+            {firebaseUser?.email && (
+              <div className="mb-4">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-300 mb-1"
+                >
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={firebaseUser.email}
+                  readOnly
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-400 focus:outline-none"
+                />
+              </div>
+            )}
+            <div>
               <label
-                htmlFor="plan_type"
+                htmlFor="full_name"
                 className="block text-sm font-medium text-gray-300 mb-1"
               >
-                Current Plan
+                Full Name
               </label>
               <input
                 type="text"
-                id="plan_type"
-                value={profile.plan_type}
-                readOnly
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-400 focus:outline-none capitalize"
+                id="full_name"
+                name="full_name"
+                value={formData.full_name || ""}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Your Full Name"
               />
             </div>
-          )}
-          {/* Buttons */}
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditing(false);
-                // Reset form data if canceling edit of existing profile
-                if (profile) {
-                  setFormData({
-                    full_name: profile.full_name || "",
-                    academic_year: profile.academic_year || undefined,
-                    academic_level: profile.academic_level || "",
-                    institution: profile.institution || "",
-                  });
-                }
-                setError(null); // Clear any errors on cancel
-              }}
-              disabled={isLoading || profile === null} // Disable if loading or no profile loaded yet
-              className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition duration-200 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 transition duration-200 disabled:opacity-50"
-            >
-              {isLoading ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-          {error && (
-            <p className="text-red-500 text-sm mt-2 text-center">
-              Error: {error}
+            <div>
+              <label
+                htmlFor="academic_year"
+                className="block text-sm font-medium text-gray-300 mb-1"
+              >
+                Academic Year / Grade
+              </label>
+              <input
+                type="number"
+                id="academic_year"
+                name="academic_year"
+                value={formData.academic_year || ""}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="e.g., 1, 2, 11, 12"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="academic_level"
+                className="block text-sm font-medium text-gray-300 mb-1"
+              >
+                Academic Level
+              </label>
+              <select
+                id="academic_level"
+                name="academic_level"
+                value={formData.academic_level || ""}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="" disabled>
+                  Select Level
+                </option>
+                {academicLevels.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="institution"
+                className="block text-sm font-medium text-gray-300 mb-1"
+              >
+                School / University
+              </label>
+              <input
+                type="text"
+                id="institution"
+                name="institution"
+                value={formData.institution || ""}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Name of your institution"
+              />
+            </div>
+            {pageError && isEditing && (
+              <p className="text-red-400 text-sm">{pageError}</p>
+            )}
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setPageError(null);
+                  if (userProfile)
+                    setFormData({
+                      full_name:
+                        userProfile.full_name ||
+                        firebaseUser?.displayName ||
+                        "",
+                      academic_year: userProfile.academic_year || undefined,
+                      academic_level: userProfile.academic_level || "",
+                      institution: userProfile.institution || "",
+                    });
+                  else if (firebaseUser)
+                    setFormData({ full_name: firebaseUser.displayName || "" });
+                }}
+                className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmittingProfile}
+                className="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 transition duration-200 disabled:opacity-50"
+              >
+                {isSubmittingProfile ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-3">
+            {firebaseUser?.photoURL && (
+              <img
+                src={firebaseUser.photoURL}
+                alt="Profile Avatar"
+                className="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-indigo-500"
+              />
+            )}
+            <p>
+              <span className="font-semibold text-gray-400">Name:</span>{" "}
+              {userProfile?.full_name || firebaseUser?.displayName || "Not Set"}
             </p>
-          )}{" "}
-          {/* Display error during edit */}
-        </form>
-      ) : (
-        // Display Profile Information (Read-only view)
-        <div className="max-w-xl mx-auto bg-gray-800/50 p-6 rounded-lg shadow-xl space-y-3">
-          {profile?.avatar_url && (
-            <img
-              src={profile.avatar_url}
-              alt="Profile Avatar"
-              className="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-indigo-500"
-            />
-          )}
-          <p>
-            <span className="font-semibold text-gray-400">Name:</span>{" "}
-            {profile?.full_name || "Not Set"}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-400">Email:</span>{" "}
-            {profile?.email}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-400">Academic Year:</span>{" "}
-            {profile?.academic_year || "Not Set"}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-400">Level:</span>{" "}
-            {profile?.academic_level || "Not Set"}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-400">Institution:</span>{" "}
-            {profile?.institution || "Not Set"}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-400 capitalize">
-              Plan:
-            </span>{" "}
-            {profile?.plan_type || "basic"}
-          </p>
-          <p>
-            <span className="font-semibold text-gray-400 capitalize">
-              credits:
-            </span>{" "}
-            {credits}
-          </p>
-          {/* Google Calendar Connection Section */}
-          <div className="pt-4 mt-4 border-t border-gray-700">
-            <h3 className="text-lg font-semibold mb-2 text-gray-200">
-              Integrations
-            </h3>
-            {isCalendarConnected ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-green-800/50 rounded">
-                  <p className="text-green-100">Google Calendar Connected</p>
-                </div>
-                {/* Add Test Event Button */}
-                <button
-                  onClick={handleCreateTestEvent}
-                  className="w-full px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition duration-200 disabled:opacity-50"
-                  disabled={isCreatingTestEvent}
-                >
-                  {isCreatingTestEvent
-                    ? "Creating Test Event..."
-                    : "Create Test Calendar Event"}
-                </button>
-                {/* Feedback Area for Test Event */}
-                {testEventFeedback && (
-                  <p
-                    className={`text-sm ${
-                      testEventFeedback.startsWith("Error")
-                        ? "text-red-400"
-                        : "text-green-400"
-                    }`}
+            <p>
+              <span className="font-semibold text-gray-400">Email:</span>{" "}
+              {userProfile?.email || firebaseUser?.email}
+            </p>
+            <p>
+              <span className="font-semibold text-gray-400">
+                Academic Year:
+              </span>{" "}
+              {userProfile?.academic_year || "Not Set"}
+            </p>
+            <p>
+              <span className="font-semibold text-gray-400">Level:</span>{" "}
+              {userProfile?.academic_level || "Not Set"}
+            </p>
+            <p>
+              <span className="font-semibold text-gray-400">Institution:</span>{" "}
+              {userProfile?.institution || "Not Set"}
+            </p>
+            <p>
+              <span className="font-semibold text-gray-400">Plan:</span>{" "}
+              <span className="capitalize">
+                {userProfile?.plan_type || "basic"}
+              </span>
+            </p>
+            <p>
+              <span className="font-semibold text-gray-400">Credits:</span>{" "}
+              {credits ?? "-"}
+            </p>
+
+            {/* Integrations Section - Display View */}
+            <div className="pt-4 mt-4 border-t border-gray-700 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2 text-gray-200">
+                  Integrations
+                </h3>
+                {isCalendarConnected ? (
+                  <div className="p-3 bg-green-800/30 rounded-md space-y-2">
+                    <p className="text-green-300">Google Calendar Connected</p>
+                    <button
+                      onClick={handleCreateTestEvent}
+                      className="w-full px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition duration-200 disabled:opacity-50"
+                      disabled={isCreatingTestEvent}
+                    >
+                      {isCreatingTestEvent
+                        ? "Creating Test Event..."
+                        : "Create Test Calendar Event"}
+                    </button>
+                    {testEventFeedback && (
+                      <p
+                        className={`text-sm ${
+                          testEventFeedback.includes("Error")
+                            ? "text-red-400"
+                            : "text-green-400"
+                        }`}
+                      >
+                        {testEventFeedback}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnectGoogleCalendar}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200 flex items-center justify-center space-x-2"
                   >
-                    {testEventFeedback}
-                  </p>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M20.283 10.356h-8.327v3.451h4.792c-.446 2.193-2.313 3.453-4.792 3.453a5.27 5.27 0 0 1-5.279-5.28 5.27 5.27 0 0 1 5.279-5.279c1.259 0 2.397.447 3.29 1.178l2.6-2.599c-1.584-1.381-3.615-2.233-5.89-2.233a8.908 8.908 0 0 0-8.934 8.934 8.907 8.907 0 0 0 8.934 8.934c4.467 0 8.529-3.249 8.529-8.934 0-.528-.081-1.097-.202-1.625z"></path>
+                    </svg>
+                    <span>Connect Google Calendar</span>
+                  </button>
                 )}
               </div>
-            ) : (
-              <button
-                onClick={connectGoogleCalendar}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200 disabled:opacity-50 flex items-center justify-center space-x-2"
-                disabled={isLoading} // Disable while loading profile
-              >
-                {/* Basic Google Icon Placeholder */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M20.283 10.356h-8.327v3.451h4.792c-.446 2.193-2.313 3.453-4.792 3.453a5.27 5.27 0 0 1-5.279-5.28 5.27 5.27 0 0 1 5.279-5.279c1.259 0 2.397.447 3.29 1.178l2.6-2.599c-1.584-1.381-3.615-2.233-5.89-2.233a8.908 8.908 0 0 0-8.934 8.934 8.907 8.907 0 0 0 8.934 8.934c4.467 0 8.529-3.249 8.529-8.934 0-.528-.081-1.097-.202-1.625z"></path>
-                </svg>
-                <span>Connect Google Calendar</span>
-              </button>
-            )}
-          </div>
 
-          {/* Canvas Integration Section */}
-          <div className="pt-4 mt-4 border-t border-gray-700">
-            <h3 className="text-lg font-semibold mb-2 text-gray-200">
-              Canvas LMS
-            </h3>
-            {isCanvasConnected ? (
-              <div className="flex items-center justify-between p-3 bg-green-800/50 rounded">
-                <p className="text-green-100">Canvas Account Connected</p>
-                <button
-                  onClick={handleDisconnectCanvas}
-                  className="ml-4 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition duration-200 disabled:opacity-50"
-                  disabled={isDisconnectingCanvas}
-                >
-                  {isDisconnectingCanvas ? "Disconnecting..." : "Disconnect"}
-                </button>
+              <div>
+                {isCanvasConnected ? (
+                  <div className="flex items-center justify-between p-3 bg-green-800/30 rounded-md">
+                    <p className="text-green-300">
+                      Canvas Account Connected ({userProfile?.canvas_domain})
+                    </p>
+                    <button
+                      onClick={handleDisconnectCanvas}
+                      className="ml-4 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition duration-200 disabled:opacity-50"
+                      disabled={isDisconnectingCanvas}
+                    >
+                      {isDisconnectingCanvas
+                        ? "Disconnecting..."
+                        : "Disconnect"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleInitiateCanvasConnection}
+                    className="w-full px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition duration-200 flex items-center justify-center space-x-2"
+                  >
+                    {/* Basic Canvas/LMS Icon Placeholder */}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                      />
+                    </svg>
+                    <span>Connect Canvas Account</span>
+                  </button>
+                )}
               </div>
-            ) : (
-              // Show initial connect button that redirects
-              <button
-                onClick={initiateCanvasConnection} // Use the new redirect function
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200 flex items-center justify-center space-x-2"
-                disabled={isLoading} // Disable while profile is loading
-              >
-                {/* Simple Canvas/LMS Icon Placeholder */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                  />
-                </svg>
-                <span>Connect Canvas Account</span>
-              </button>
-            )}
-          </div>
+            </div>
 
-          <div className="flex justify-end space-x-3 pt-4 mt-4 border-t border-gray-700">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 transition duration-200"
-            >
-              Edit Profile
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-200"
-            >
-              Logout
-            </button>
+            <div className="flex justify-end space-x-3 pt-4 mt-6 border-t border-gray-700">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 transition duration-200"
+              >
+                Edit Profile
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-200"
+              >
+                Logout
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

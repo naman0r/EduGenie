@@ -8,26 +8,17 @@ import React, {
   ChangeEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-// import { Button } from "@/components/ui/button"; // Removed Shadcn
-// import {
-//   Card,
-//   CardHeader,
-//   CardTitle,
-//   CardDescription,
-// } from "@/components/ui/card"; // Removed Shadcn
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns"; // For relative time
 import { Pencil, Trash2, Check, X } from "lucide-react"; // Import icons
-
-// Removed placeholder useAuth hook
-// const useAuth = () => ({ user: { google_id: "test-user-id" } });
-
-interface Genie {
-  id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-}
+import {
+  Genie,
+  fetchGenies,
+  createGenie,
+  updateGenie,
+  deleteGenie,
+} from "@/services/genies";
+import { useAuth } from "@/context/AuthContext";
 
 // --- Skeleton Component (Updated Styling) ---
 const SkeletonCard: React.FC = () => (
@@ -44,6 +35,7 @@ const SkeletonCard: React.FC = () => (
 );
 
 const GeniesPage: React.FC = () => {
+  const { firebaseUser } = useAuth();
   const [genies, setGenies] = useState<Genie[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCreate, setIsLoadingCreate] = useState(false); // Separate loading state for create
@@ -69,28 +61,17 @@ const GeniesPage: React.FC = () => {
 
   // --- Fetch Genies ---
   useEffect(() => {
-    const googleId = localStorage.getItem("google_id"); // Get from local storage
-    if (!googleId) {
+    if (!firebaseUser) {
       setError("User not logged in. Please log in to view Genies.");
       setIsLoading(false);
       return;
     }
 
-    const fetchGenies = async (id: string) => {
+    const loadGenies = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-        if (!backendUrl) {
-          throw new Error("Backend URL environment variable not set.");
-        }
-        const response = await fetch(`${backendUrl}/genie/users/${id}`);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch genies (${response.status}): ${response.statusText}`
-          );
-        }
-        const data: Genie[] = await response.json();
+        const data = await fetchGenies(firebaseUser.uid);
         setGenies(data);
       } catch (err: any) {
         setError(err.message || "An error occurred while fetching genies.");
@@ -100,63 +81,27 @@ const GeniesPage: React.FC = () => {
       }
     };
 
-    fetchGenies(googleId);
-  }, []); // Only run once on mount
+    loadGenies();
+  }, [firebaseUser]);
 
   // --- Handle New Genie Creation ---
   const handleNewGenie = async () => {
-    const googleId = localStorage.getItem("google_id"); // Get from local storage
-    if (!googleId) {
+    if (!firebaseUser) {
       setError("User not logged in. Cannot create Genie.");
-      console.error("Create Genie Error: google_id not found in localStorage.");
       return;
     }
 
-    console.log("Attempting to create new Genie for user:", googleId);
-    setIsLoadingCreate(true); // Use separate loading state
+    setIsLoadingCreate(true);
     setError(null);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) {
-        throw new Error("Backend URL environment variable not set.");
-      }
-      const apiUrl = `${backendUrl}/genie/users/${googleId}`;
-      console.log("Calling API:", apiUrl);
-
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}), // Creates with default name "New Genie"
-      });
-
-      console.log("API Response Status:", response.status);
-      const responseText = await response.text(); // Read response body once
-      console.log("API Response Body:", responseText);
-
-      if (!response.ok) {
-        // Try to parse error from backend if JSON, otherwise use text
-        let errorDetails = responseText;
-        try {
-          const errorJson = JSON.parse(responseText);
-          errorDetails =
-            errorJson.description || errorJson.error || responseText;
-        } catch (parseError) {
-          /* Ignore if not JSON */
-        }
-        throw new Error(
-          `Failed to create genie (${response.status}): ${errorDetails}`
-        );
-      }
-
-      const newGenie: Genie = JSON.parse(responseText); // Parse the successful response
-      console.log("New Genie created:", newGenie);
+      const newGenie = await createGenie(firebaseUser.uid);
       router.push(`/genies/${newGenie.id}`);
     } catch (err: any) {
       setError(err.message || "An error occurred while creating the genie.");
       console.error("Create Genie Error:", err);
     } finally {
-      setIsLoadingCreate(false); // Stop loading create state
+      setIsLoadingCreate(false);
     }
   };
 
@@ -181,7 +126,7 @@ const GeniesPage: React.FC = () => {
   };
 
   const handleSaveName = async () => {
-    if (!editingGenieId || !editingName.trim()) {
+    if (!firebaseUser || !editingGenieId || !editingName.trim()) {
       handleCancelEdit();
       return;
     }
@@ -191,34 +136,12 @@ const GeniesPage: React.FC = () => {
       return; // No change
     }
 
-    const googleId = localStorage.getItem("google_id");
-    if (!googleId) {
-      setError("Login required");
-      return;
-    }
-
     setIsUpdating(true);
     setError(null);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) throw new Error("Backend URL not set.");
-      const response = await fetch(`${backendUrl}/genie/${editingGenieId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Google-ID": googleId,
-        }, // Pass user ID
-        body: JSON.stringify({ name: editingName.trim() }),
+      const updatedGenie = await updateGenie(editingGenieId, firebaseUser.uid, {
+        name: editingName.trim(),
       });
-      const responseText = await response.text();
-      if (!response.ok) {
-        let details = responseText;
-        try {
-          details = JSON.parse(responseText).description || details;
-        } catch (e) {}
-        throw new Error(`Update failed (${response.status}): ${details}`);
-      }
-      const updatedGenie: Genie = JSON.parse(responseText);
       setGenies((prev) =>
         prev.map((g) => (g.id === editingGenieId ? updatedGenie : g))
       );
@@ -253,12 +176,7 @@ const GeniesPage: React.FC = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!deletingGenieId) return;
-    const googleId = localStorage.getItem("google_id");
-    if (!googleId) {
-      setError("Login required");
-      return;
-    }
+    if (!firebaseUser || !deletingGenieId) return;
 
     console.log(`Confirming delete for: ${deletingGenieId}`); // Log
     setIsUpdating(true);
@@ -267,20 +185,7 @@ const GeniesPage: React.FC = () => {
     setDeletingGenieId(null); // Clear confirmation prompt immediately
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      if (!backendUrl) throw new Error("Backend URL not set.");
-      const response = await fetch(`${backendUrl}/genie/${genieToDeleteId}`, {
-        method: "DELETE",
-        headers: { "X-Google-ID": googleId }, // Pass user ID for ownership check
-      });
-      if (!response.ok) {
-        const responseText = await response.text();
-        let details = responseText;
-        try {
-          details = JSON.parse(responseText).description || details;
-        } catch (e) {}
-        throw new Error(`Delete failed (${response.status}): ${details}`);
-      }
+      await deleteGenie(genieToDeleteId, firebaseUser.uid);
       // Remove from UI
       setGenies((prev) => prev.filter((g) => g.id !== genieToDeleteId));
       console.log(`Successfully deleted genie ${genieToDeleteId}`); // Log success

@@ -9,13 +9,17 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.2",
+    "@radix-ui/react-toast": "^1.2.13",
     "@tabler/icons-react": "^3.31.0",
     "@tsparticles/engine": "^3.8.1",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.8.1",
     "@types/dagre": "^0.7.52",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",
+    "date-fns": "^4.1.0",
     "firebase": "^11.4.0",
     "lucide-react": "^0.482.0",
     "motion": "^12.5.0",

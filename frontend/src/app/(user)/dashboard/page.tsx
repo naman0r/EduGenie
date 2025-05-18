@@ -1,66 +1,79 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/utils/firebase";
-import AddClassForm from "@/components/AddClassForm"; // Import the form component
-import { User } from "firebase/auth"; // Import User type
-import Link from "next/link"; // Import Link
+import AddClassForm from "@/components/AddClassForm";
+import Link from "next/link";
 import { ClassData } from "@/types/class";
+import { useAuth } from "@/context/AuthContext";
 
-// Define the structure of class data (matches backend ClassInfo)
+// Define the payload structure AddClassForm will provide, matching AuthContext's addClass
+interface AddClassFormPayload {
+  name: string;
+  code?: string;
+  instructor?: string;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [classes, setClasses] = useState<ClassData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    firebaseUser,
+    isLoading: authIsLoading,
+    authError,
+    classes,
+    isLoadingClasses,
+    fetchClassesError,
+    addClass,
+    refreshData,
+  } = useAuth();
+
   const [showAddForm, setShowAddForm] = useState(false);
+  // Local error state for the add class form submission itself
+  const [addClassFormError, setAddClassFormError] = useState<string | null>(
+    null
+  );
 
-  // Effect for auth state and initial data fetching
+  // useEffect for redirecting if not logged in is implicitly handled by AuthContext or a wrapper component
+  // However, an explicit check before rendering content is still good practice.
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        // Fetch classes once user is confirmed
-        try {
-          const googleId = currentUser.uid;
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${googleId}/classes`
-          );
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const fetchedClasses: ClassData[] = await response.json();
-          setClasses(fetchedClasses);
-          setError(null);
-        } catch (err: any) {
-          console.error("Failed to fetch classes:", err);
-          setError("Failed to load classes. Please try again later.");
-          setClasses([]); // Clear classes on error
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        // Not logged in
-        setUser(null);
-        setIsLoading(false);
-        router.push("/"); // Redirect to home
-      }
-    });
+    if (!authIsLoading && !firebaseUser && !authError) {
+      router.push("/");
+    }
+  }, [authIsLoading, firebaseUser, authError, router]);
 
-    return () => unsubscribe();
-  }, [router]);
-
-  // Callback function for AddClassForm
-  const handleClassAdded = (newClass: ClassData) => {
-    setClasses((prevClasses) => [newClass, ...prevClasses]); // Add new class to the top of the list
-    setShowAddForm(false); // Hide form after adding
+  const handleAddNewClass = async (formData: AddClassFormPayload) => {
+    if (!firebaseUser) {
+      setAddClassFormError("You must be logged in to add a class.");
+      return;
+    }
+    setAddClassFormError(null);
+    try {
+      await addClass(formData); // Use addClass from AuthContext
+      setShowAddForm(false); // Close form on success
+    } catch (err: any) {
+      console.error("Failed to add class:", err);
+      setAddClassFormError(
+        err.message || "Could not add class. Please try again."
+      );
+    }
   };
 
-  // Render Loading State
-  if (isLoading) {
+  const handleRetry = () => {
+    if (authError) {
+      // If there's an auth error, the primary action should be to guide the user to resolve auth.
+      // This might involve redirecting to login or a generic refresh.
+      // For now, if authError is present, it's likely a broader issue than just classes.
+      // Attempting a full refreshData might re-trigger the auth flow or update user state.
+      refreshData();
+      // Or, router.push("/") if it's a persistent auth issue.
+    } else if (fetchClassesError) {
+      refreshData(); // This will call loadUserData which includes fetching classes
+    }
+  };
+
+  const pageIsLoading = authIsLoading || (firebaseUser && isLoadingClasses); // Classes only load if firebaseUser exists
+
+  if (pageIsLoading) {
     return (
       <div className="min-h-screen bg-black/[0.96] text-white flex justify-center items-center">
         Loading dashboard...
@@ -68,43 +81,60 @@ export default function DashboardPage() {
     );
   }
 
-  // Render Error State
-  if (error) {
+  const displayError = authError || fetchClassesError;
+
+  if (displayError) {
     return (
       <div className="min-h-screen bg-black/[0.96] text-red-500 flex flex-col justify-center items-center p-8">
-        <p>{error}</p>
+        <p>{displayError}</p>
         <button
-          onClick={() => window.location.reload()} // Simple retry
+          onClick={handleRetry}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200"
         >
-          Retry
+          {authError ? "Try to Reload" : "Retry Fetching Classes"}
         </button>
       </div>
     );
   }
 
-  // Render Dashboard Content
+  if (!firebaseUser) {
+    // Should be caught by useEffect redirect, but as a fallback
+    // This state indicates auth is resolved (not loading), no authError, but no firebaseUser.
+    // The useEffect above should have redirected to '/'.
+    // If somehow reached, provide a clear message.
+    return (
+      <div className="min-h-screen bg-black/[0.96] text-white flex flex-col justify-center items-center">
+        <p>Redirecting to login...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16 pt-35">
+    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Your Classes</h1>
         <button
-          onClick={() => setShowAddForm(true)}
+          onClick={() => {
+            setShowAddForm(true);
+            setAddClassFormError(null); // Clear previous form error when opening
+          }}
           className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition duration-200 shadow-lg"
         >
           + Add New Class
         </button>
       </div>
 
-      {/* Class List or Prompt */}
-      {classes.length === 0 ? (
+      {classes.length === 0 && !isLoadingClasses ? ( // Ensure not loading before showing 'no classes'
         <div className="text-center py-10 px-6 bg-gray-800/40 rounded-lg shadow-md">
           <h2 className="text-xl text-gray-300 mb-4">No classes added yet.</h2>
           <p className="text-gray-400 mb-6">
             Get started by adding your first class!
           </p>
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              setShowAddForm(true);
+              setAddClassFormError(null); // Clear previous form error
+            }}
             className="px-6 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition duration-200 shadow-lg text-lg font-semibold"
           >
             Add Your First Class
@@ -148,12 +178,14 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Modal Form */}
-      {showAddForm && user && (
+      {showAddForm && (
         <AddClassForm
-          userId={user.uid} // Pass user's google_id (uid)
-          onClassAdded={handleClassAdded}
-          onCancel={() => setShowAddForm(false)}
+          onSubmitClass={handleAddNewClass}
+          onCancel={() => {
+            setShowAddForm(false);
+            setAddClassFormError(null);
+          }}
+          formError={addClassFormError}
         />
       )}
     </div>

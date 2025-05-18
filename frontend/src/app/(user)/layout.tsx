@@ -12,6 +12,7 @@ import {
   IconLogout, // Logout
   IconBrandBitbucket,
   IconBubbleText,
+  IconGhost2,
 } from "@tabler/icons-react";
 import { motion } from "motion/react"; // For potential logo animation if reused
 import { cn } from "@/lib/utils";
@@ -67,6 +68,13 @@ export default function UserLayout({
       href: "/chat",
       icon: (
         <IconBubbleText className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+      ),
+    },
+    {
+      label: "Genies",
+      href: "/genies",
+      icon: (
+        <IconGhost2 className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
     },
     {
@@ -161,7 +169,7 @@ export default function UserLayout({
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto">
-        <div className="pt-10">{children}</div>
+        <div className="">{children}</div>
       </main>
     </div>
   );

@@ -1,374 +1,81 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { auth } from "@/utils/firebase"; // For auth check
-import { User } from "firebase/auth";
 import Link from "next/link";
-import { ResourceInfo } from "@/types/resources";
-import { Task } from "@/types/task";
-import { ClassData } from "@/types/class";
+import { useClassDetails } from "@/hooks/useClassDetails";
+import { useResources } from "@/hooks/useResources";
+import { useTasks } from "@/hooks/useTasks";
 import TaskCard from "@/components/TaskCard";
 import CanvasAssignmentsModal from "@/components/CanvasAssignmentsModal";
+import { ClassData } from "@/types/class";
 
 export default function ClassDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const classId = params.classId as string;
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const [user, setUser] = useState<User | null>(null);
-  const [classDetails, setClassDetails] = useState<ClassData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const {
+    user,
+    classDetails,
+    isLoading,
+    error,
+    isAuthorized,
+    isDeleting,
+    deleteError,
+    handleDeleteClass,
+  } = useClassDetails(classId);
 
-  // --- Add Resource State ---
-  const [resources, setResources] = useState<ResourceInfo[]>([]);
-  const [resourcesLoading, setResourcesLoading] = useState(true);
-  const [resourcesError, setResourcesError] = useState<string | null>(null);
+  const {
+    resources,
+    resourcesLoading,
+    resourcesError,
+    showCreateResourceModal,
+    resourceCreationStep,
+    selectedType,
+    newResourceName,
+    setNewResourceName,
+    fetchResources,
+    handleOpenCreateModal,
+    handleSelectType,
+    handleGoBackToTypeSelection,
+    handleCancelCreation,
+    performResourceCreation,
+  } = useResources(classId);
 
-  // --- State for Resource Creation Modal ---
-  const [showCreateResourceModal, setShowCreateResourceModal] = useState(false);
-  const [resourceCreationStep, setResourceCreationStep] = useState<
-    "selectType" | "enterName" | "creating"
-  >("selectType");
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [newResourceName, setNewResourceName] = useState<string>("");
+  const {
+    tasks,
+    tasksLoading,
+    tasksError,
+    showCanvasModal,
+    setShowCanvasModal,
+    fetchTasks,
+    handleTaskStatusChange,
+    handleCanvasImportSuccess,
+  } = useTasks(classId);
 
-  // --- Tasks (Assignments) State ---
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
-  const [tasksError, setTasksError] = useState<string | null>(null);
-
-  // --- Canvas Assignments Modal State ---
-  const [showCanvasModal, setShowCanvasModal] = useState(false);
-
-  // *** RESTORE SYLLABUS STATE HERE ***
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<
-    "idle" | "uploading" | "success" | "error"
-  >("idle");
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  // We don't need showResourceOptions anymore as it was replaced by the modal logic
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setSelectedFile(e.target.files[0]);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setUploadError("Please select a file to upload.");
-      return;
-    }
-    setUploadStatus("uploading");
-    setUploadError(null);
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/syllabus`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-      if (!res.ok) throw new Error(`Upload failed with status ${res.status}`);
-      setUploadStatus("success");
-    } catch (err: any) {
-      console.error("Upload error:", err);
-      setUploadStatus("error");
-      setUploadError(err.message);
-    }
-  };
-
-  // Function to verify if user is associated with the class
-  const verifyClassAssociation = async (userId: string) => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/check-access/${userId}`
-      );
-      
-      if (!response.ok) {
-        if (response.status === 403) {
-          return false;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      return data.has_access;
-    } catch (err) {
-      console.error("Failed to verify class association:", err);
-      return false;
-    }
-  };
-
-  // --- Fetch Class Details Effect ---
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        if (classId) {
-          try {
-            setIsLoading(true);
-            
-            // First verify if user is associated with the class
-            const isAssociated = await verifyClassAssociation(currentUser.uid);
-            if (!isAssociated) {
-              setError("You do not have permission to view this class.");
-              setClassDetails(null);
-              setIsAuthorized(false);
-              setIsLoading(false);
-              return;
-            }
-            setIsAuthorized(true);
-
-            const response = await fetch(
-              `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}`
-            );
-
-            if (!response.ok) {
-              if (response.status === 404) {
-                setError("Class not found.");
-              } else {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              setClassDetails(null);
-            } else {
-              const data: ClassData = await response.json();
-              setClassDetails(data);
-              setError(null);
-            }
-          } catch (err: any) {
-            console.error("Failed to fetch class details:", err);
-            setError("Failed to load class details. Please try again later.");
-            setClassDetails(null);
-          } finally {
-            setIsLoading(false);
-          }
-        } else {
-          setError("Invalid Class ID.");
-          setIsLoading(false);
-        }
-      } else {
-        setUser(null);
-        setIsLoading(false);
-        router.push("/");
-      }
-    });
-
-    return () => unsubscribe();
-  }, [classId, router]);
-
-  // --- Fetch Resources Effect ---
-  const fetchResources = useCallback(async () => {
-    if (!user || !classId) return; // Need user and classId
-
-    setResourcesLoading(true);
-    setResourcesError(null);
-
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) {
-        throw new Error("Authentication token not available.");
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${user.uid}/resources?class_id=${classId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to fetch resources: ${response.status} - ${errorText}`
-        );
-      }
-
-      const data: ResourceInfo[] = await response.json();
-      setResources(data);
-    } catch (err: any) {
-      console.error("Failed to fetch resources:", err);
-      setResourcesError("Failed to load resources. Please try again later.");
-    } finally {
-      setResourcesLoading(false);
-    }
-  }, [user, classId]);
-
-  // --- Fetch Tasks Effect ---
-  const fetchTasks = useCallback(async () => {
-    if (!user || !classId) return;
-
-    setTasksLoading(true);
-    setTasksError(null);
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/tasks?google_id=${user.uid}`
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to fetch tasks: ${response.status} - ${errorText}`
-        );
-      }
-
-      const data: Task[] = await response.json();
-      setTasks(data);
-    } catch (err: any) {
-      console.error("Failed to fetch tasks:", err);
-      setTasksError("Failed to load tasks. Please try again later.");
-    } finally {
-      setTasksLoading(false);
-    }
-  }, [user, classId]);
-
-  // --- Handle Task Status Change ---
-  const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
-    if (!user || !classId) return;
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/tasks/${taskId}/status`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            google_id: user.uid,
-            status: newStatus,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to update task status: ${response.status}`);
-      }
-
-      // Update local state
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task.id === taskId ? { ...task, status: newStatus as any } : task
-        )
-      );
-    } catch (err: any) {
-      console.error("Failed to update task status:", err);
-      // Could show an error toast or message here
-    }
-  };
-
-  // --- Trigger Fetch Resources and Tasks Effect ---
+  // Fetch resources and tasks when user and class details are loaded
   useEffect(() => {
     if (!isLoading && user && classId) {
-      fetchResources();
-      fetchTasks();
+      fetchResources(user);
+      fetchTasks(user);
     }
   }, [isLoading, user, classId, fetchResources, fetchTasks]);
-
-  // --- Handle Canvas Assignments Import Success ---
-  const handleCanvasImportSuccess = () => {
-    fetchTasks(); // Refresh tasks after import
-  };
-
-  // --- Handle Resource Creation (Actual API call) ---
-  // Renamed to indicate it performs the final action
-  const performResourceCreation = async () => {
-    // Guard clauses using the new state variables
-    if (!user || !classId || !selectedType || !newResourceName) {
-      setResourcesError(
-        "Cannot create resource: Missing user, class, type, or name information."
-      );
-      setResourceCreationStep("enterName"); // Go back to name step if info missing
-      return;
-    }
-    setResourceCreationStep("creating"); // Set step to creating
-    setResourcesError(null);
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${user.uid}/resources`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            // Authorization: `Bearer ${token}`, // Keep commented out for now
-          },
-          body: JSON.stringify({
-            class_id: classId,
-            user_id: user.uid,
-            type: selectedType, // Use state variable
-            name: newResourceName, // Use state variable
-            content: {},
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          `Failed to create resource: ${response.status} - ${
-            errorData.detail || "Unknown error"
-          }`
-        );
-      }
-
-      const newResource: ResourceInfo = await response.json();
-      setResources((prevResources) => [newResource, ...prevResources]);
-      setShowCreateResourceModal(false); // Close modal on success
-    } catch (err: any) {
-      console.error("Failed to create resource:", err);
-      setResourcesError(
-        err.message || "Failed to create resource. Please try again."
-      );
-      setResourceCreationStep("enterName"); // Go back to name step on error
-    }
-    // No finally block needed here, step state handles loading/idle transition
-  };
-
-  const handleOpenCreateModal = () => {
-    setShowCreateResourceModal(true);
-    setResourceCreationStep("selectType");
-    setSelectedType(null);
-    setNewResourceName("");
-    setResourcesError(null); // Clear previous errors
-  };
-
-  const handleSelectType = (type: string) => {
-    setSelectedType(type);
-    // Set default name based on type
-    let defaultName = "New Resource";
-    if (type === "Mindmap") defaultName = "New Mindmap";
-    if (type === "flashcards") defaultName = "New Flashcard Set";
-    if (type === "Text notes") defaultName = "New Note";
-    setNewResourceName(defaultName);
-    setResourceCreationStep("enterName");
-  };
-
-  //  Handler to go back to type selection
-  const handleGoBackToTypeSelection = () => {
-    setResourceCreationStep("selectType");
-    setResourcesError(null); // Clear errors when going back
-  };
-
-  //  Handler to cancel/close modal
-  const handleCancelCreation = () => {
-    setShowCreateResourceModal(false);
-  };
 
   // Add early return if not authorized
   if (!isAuthorized && !isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h1>
           <p className="text-gray-600">{error}</p>
-          <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">
+          <Link
+            href="/"
+            className="mt-4 inline-block text-blue-600 hover:underline"
+          >
             Return to Home
           </Link>
         </div>
@@ -376,12 +83,10 @@ export default function ClassDetailsPage() {
     );
   }
 
-  //  Combined Loading State
-  // Show loading if class details are loading OR resources are loading
+  // Combined Loading State
   if (isLoading || resourcesLoading || tasksLoading) {
     return (
       <div className="min-h-screen bg-black/[0.96] text-white flex justify-center items-center">
-        {/* Be more specific if possible */}
         {isLoading
           ? "Loading class details..."
           : resourcesLoading
@@ -391,13 +96,13 @@ export default function ClassDetailsPage() {
     );
   }
 
-  //  Error State (Prioritize class details error)
+  // Error State
   if (error) {
     return (
       <div className="min-h-screen bg-black/[0.96] text-red-500 flex flex-col justify-center items-center p-8">
         <p className="text-xl mb-4">{error}</p>
         <button
-          onClick={() => router.push("/dashboard")} // Go back to dashboard
+          onClick={() => router.push("/dashboard")}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200"
         >
           Back to Dashboard
@@ -406,9 +111,8 @@ export default function ClassDetailsPage() {
     );
   }
 
-  //  Render Class Details (only if classDetails are available)
+  // Render Class Details
   if (!classDetails) {
-    // This case might occur briefly or if there was an issue not caught by error state
     return (
       <div className="min-h-screen bg-black/[0.96] text-white flex justify-center items-center">
         No class details found.
@@ -418,50 +122,54 @@ export default function ClassDetailsPage() {
 
   return (
     <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16">
-      {/* Header with Class Name */}
+      {/* Header with Class Name and Delete Button */}
       <div className="mb-8 border-b border-gray-700 pb-4">
-        <h1 className="text-3xl font-bold truncate" title={classDetails.name}>
-          {classDetails.name}
-        </h1>
-        <div className="flex space-x-4 text-sm text-gray-400 mt-2">
-          {classDetails.code && (
-            <span>
-              Code: <span className="text-indigo-300">{classDetails.code}</span>
-            </span>
-          )}
-          {classDetails.instructor && (
-            <span>
-              Instructor:{" "}
-              <span className="text-gray-300">{classDetails.instructor}</span>
-            </span>
-          )}
+        <div className="flex justify-between items-start">
+          <div>
+            <h1
+              className="text-3xl font-bold truncate"
+              title={classDetails.name}
+            >
+              {classDetails.name}
+            </h1>
+            <div className="flex space-x-4 text-sm text-gray-400 mt-2">
+              {classDetails.code && (
+                <span>
+                  Code:{" "}
+                  <span className="text-indigo-300">{classDetails.code}</span>
+                </span>
+              )}
+              {classDetails.instructor && (
+                <span>
+                  Instructor:{" "}
+                  <span className="text-gray-300">
+                    {classDetails.instructor}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="p-2 text-red-500 hover:text-red-600 transition-colors"
+            title="Delete Class"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
         </div>
-      </div>
-
-      {/* Syllabus Upload Section */}
-      <div className="bg-gray-800/30 p-6 rounded-lg shadow-xl mb-6">
-        <h2 className="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">
-          Upload Syllabus
-        </h2>
-        <input
-          type="file"
-          accept=".pdf,.docx"
-          onChange={handleFileChange}
-          className="mb-2 text-gray-100"
-        />
-        <button
-          onClick={handleUpload}
-          disabled={!selectedFile || uploadStatus === "uploading"}
-          className="ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {uploadStatus === "uploading" ? "Uploading..." : "Upload"}
-        </button>
-        {uploadStatus === "success" && (
-          <p className="text-green-400 mt-2">Upload successful!</p>
-        )}
-        {uploadStatus === "error" && uploadError && (
-          <p className="text-red-500 mt-2">Error: {uploadError}</p>
-        )}
       </div>
 
       {/* Content Columns: Resources & Tasks */}
@@ -471,8 +179,7 @@ export default function ClassDetailsPage() {
           <div className="flex justify-between items-center border-b border-gray-600 pb-2 mb-4">
             <h2 className="text-xl font-semibold">Study Resources</h2>
             <button
-              onClick={handleOpenCreateModal} // Use new handler
-              // disabled={isCreatingResource} // Disable handled inside modal now
+              onClick={handleOpenCreateModal}
               className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm"
             >
               + New Resource
@@ -511,7 +218,7 @@ export default function ClassDetailsPage() {
             </ul>
           )}
 
-          {/* Combined Create Resource Modal */}
+          {/* Create Resource Modal */}
           {showCreateResourceModal && (
             <div className="absolute top-16 right-0 left-0 mx-auto w-64 bg-gray-700 rounded-md shadow-lg z-10 p-4 border border-gray-600 flex flex-col space-y-3">
               {/* Step 1: Select Type */}
@@ -554,14 +261,13 @@ export default function ClassDetailsPage() {
                     placeholder="Enter name..."
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
-                  {/* Display specific error from creation attempt */}
                   {resourcesError && (
                     <p className="text-xs text-red-400 text-center">
                       {resourcesError}
                     </p>
                   )}
                   <button
-                    onClick={performResourceCreation} // Final create action
+                    onClick={() => user && performResourceCreation(user)}
                     className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                   >
                     Create
@@ -653,7 +359,9 @@ export default function ClassDetailsPage() {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onStatusChange={handleTaskStatusChange}
+                  onStatusChange={(newStatus) =>
+                    user && handleTaskStatusChange(task.id, newStatus, user)
+                  }
                 />
               ))
             )}
@@ -669,8 +377,53 @@ export default function ClassDetailsPage() {
           userId={user.uid}
           classId={classId}
           canvasCourseId={classDetails.canvas_course_id}
-          onImportSuccess={handleCanvasImportSuccess}
+          onImportSuccess={() => user && handleCanvasImportSuccess(user)}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-4 rounded-lg shadow-xl w-[300px]">
+            <div className="flex items-center gap-3 mb-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 text-red-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <h3 className="text-lg font-medium">Delete Class</h3>
+            </div>
+            <p className="text-sm text-gray-300 mb-4">
+              This action cannot be undone.
+            </p>
+            {deleteError && (
+              <p className="text-sm text-red-500 mb-3">{deleteError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-3 py-1.5 text-sm text-gray-300 hover:text-white transition-colors"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteClass}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Display Class ID for reference */}
