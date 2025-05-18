@@ -35,7 +35,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
-          <div className="relative w-full flex items-center justify-center">
+          <div className="relative w-auto flex items-center justify-center">
             {<NavBar />}
           </div>
           {children}

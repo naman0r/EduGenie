@@ -7,6 +7,7 @@ import MindmapDisplay from "@/components/MindmapDisplay";
 import FlashcardEditor from "@/components/FlashcardEditor";
 import { ResourceInfo } from "@/types/resources";
 
+import { useAuth } from "@/context/AuthContext";
 // Define a more specific type for the fetched resource, including content
 interface DetailedResourceInfo extends ResourceInfo {
   content: any; // Or a more specific type based on potential content structures
@@ -14,6 +15,7 @@ interface DetailedResourceInfo extends ResourceInfo {
 }
 
 const ResourceDetailPage = () => {
+  const { firebaseUser } = useAuth();
   const params = useParams();
   const resourceId = params.id as string;
   const [resource, setResource] = useState<DetailedResourceInfo | null>(null);
@@ -23,9 +25,8 @@ const ResourceDetailPage = () => {
 
   useEffect(() => {
     // Get userId from localStorage on the client side
-    const storedUserId = localStorage.getItem("google_id");
-    if (storedUserId) {
-      setUserId(storedUserId);
+    if (firebaseUser) {
+      setUserId(firebaseUser.uid);
     } else {
       setError("User not logged in.");
       setIsLoading(false);
@@ -33,9 +34,8 @@ const ResourceDetailPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!resourceId || !userId) {
-      // Don't fetch if IDs are not available
-      if (!resourceId) setError("Resource ID missing from URL.");
+    if (!resourceId) {
+      setError("Resource ID missing from URL.");
       setIsLoading(false);
       return;
     }
@@ -146,11 +146,13 @@ const ResourceDetailPage = () => {
           <pre className="text-gray-300 whitespace-pre-wrap break-words">
             {JSON.stringify(resource.content, null, 2)}
           </pre>
-          {resource.type !== "Text notes" && resource.type !== "Mindmap" && resource.type !== "flashcards" && (
-            <p className="mt-4 text-sm text-yellow-400">
-              Display/Editing for '{resource.type}' type is not yet supported.
-            </p>
-          )}
+          {resource.type !== "Text notes" &&
+            resource.type !== "Mindmap" &&
+            resource.type !== "flashcards" && (
+              <p className="mt-4 text-sm text-yellow-400">
+                Display/Editing for '{resource.type}' type is not yet supported.
+              </p>
+            )}
         </div>
       )}
     </div>

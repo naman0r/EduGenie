@@ -50,7 +50,7 @@ export const useTasks = (classId: string) => {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/tasks/${taskId}/status`,
         {
-          method: "PUT",
+          method: "OPTIONS",
           headers: {
             "Content-Type": "application/json",
           },

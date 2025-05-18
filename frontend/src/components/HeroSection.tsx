@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { SparklesCore } from "../components/ui/sparkles";
 import { GlowingEffect } from "./ui/glowing-effect";
+import NavBar from "./NavBar";
 import {
   BookOpen,
   BrainCircuit,
@@ -96,6 +97,7 @@ const HeroSection = () => {
   ];
   return (
     <div className="relative w-full min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden rounded-md pt-20 pb-10 md:pt-24 md:pb-16 px-4 font-mono">
+      <NavBar />
       <div className="w-full absolute inset-0 h-full z-0">
         <SparklesCore
           id="tsparticlesfullpage"
