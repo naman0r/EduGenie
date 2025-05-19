@@ -117,16 +117,7 @@ const ChatPage: React.FC = () => {
 
       const aiMessage: ChatMessage = JSON.parse(responseText);
 
-      // Replace optimistic user message if IDs differ (though unlikely here) and add AI message
-      // Or simply add AI message
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== optimisticUserMessage.id),
-        optimisticUserMessage,
-        aiMessage,
-      ]);
       // For simplicity, let's just add the AI message. Backend handles user msg saving.
-      // setMessages(prev => [...prev, aiMessage]);
-      // Correction: The backend saves *both*. The POST returns the *AI* message. So we only need to add the AI one.
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err: any) {
       setError(err.message || "An error occurred sending the message.");
@@ -141,7 +132,7 @@ const ChatPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-b from-gray-900 to-black text-slate-200">
+    <div className="flex flex-col h-screen bg-gradient-to-b from-gray-900 to-black text-slate-200 overflow-y-auto">
       {/* Assume header takes ~pt-16 or 4rem. Adjust padding below header */}
       <div className="flex-grow flex flex-col pt-16">
         {/* Message Display Area: Takes remaining height, scrollable */}
