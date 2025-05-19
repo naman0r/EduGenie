@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, FormEvent } from "react";
 import { useParams } from "next/navigation"; // To get ID from URL
+import dynamic from "next/dynamic";
 
 interface ChatMessage {
   id: string; // UUID
@@ -13,6 +14,11 @@ interface ChatMessage {
   created_at: string; // ISO timestamp
 }
 
+const MindmapChatView = dynamic(
+  () => import("../_chatComponents/MindmapChatView"),
+  { ssr: false }
+);
+
 const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -23,6 +29,10 @@ const ChatPage: React.FC = () => {
   const chatId = params.id as string; // Get chat ID from route
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showResourcePanel, setShowResourcePanel] = useState(false);
+  const [resourcePanelIndex, setResourcePanelIndex] = useState(0);
+  const resourceOptions = ["mindmap", "flashcard", "quiz", "summary"];
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // --- Helper: Scroll to bottom ---
   const scrollToBottom = () => {
@@ -69,7 +79,17 @@ const ChatPage: React.FC = () => {
     event.preventDefault();
     if (!newMessage.trim() || isSending) return;
 
-    const userMessageText = newMessage.trim();
+    let userMessageText = newMessage.trim();
+    let resourceType: string | null = null;
+
+    // Detect @mindmap annotation (case-insensitive, word boundary)
+    const mindmapRegex = /@mindmap\b/i;
+    if (mindmapRegex.test(userMessageText)) {
+      resourceType = "mindmap";
+      // Remove the annotation from the message text
+      userMessageText = userMessageText.replace(mindmapRegex, "").trim();
+    }
+
     setNewMessage(""); // Clear input immediately
     setIsSending(true);
     setError(null);
@@ -93,10 +113,13 @@ const ChatPage: React.FC = () => {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) throw new Error("Backend URL not set.");
 
+      const body: any = { message_text: userMessageText };
+      if (resourceType) body.resource_type = resourceType;
+
       const response = await fetch(`${backendUrl}/genie/${chatId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message_text: userMessageText }),
+        body: JSON.stringify(body),
       });
 
       const responseText = await response.text(); // Read response body once
@@ -117,7 +140,9 @@ const ChatPage: React.FC = () => {
 
       const aiMessage: ChatMessage = JSON.parse(responseText);
 
-      // For simplicity, let's just add the AI message. Backend handles user msg saving.
+      console.log("AI resource_type:", aiMessage.resource_type);
+      console.log("AI content:", aiMessage.content);
+
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err: any) {
       setError(err.message || "An error occurred sending the message.");
@@ -156,20 +181,30 @@ const ChatPage: React.FC = () => {
                 msg.sender === "user" ? "justify-end" : "justify-start"
               }`}
             >
-              {/* Message Bubble Styling */}
               <div
                 className={`max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl px-4 py-3 rounded-xl shadow-md break-words ${
                   msg.sender === "user"
-                    ? "bg-indigo-600 text-white" // User message style
-                    : "bg-slate-700 text-slate-100" // AI message style
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-700 text-slate-100"
                 }`}
+                style={
+                  msg.sender === "ai" &&
+                  msg.resource_type === "mindmap" &&
+                  msg.content
+                    ? { width: "100%", height: "400px", minWidth: "300px" }
+                    : {}
+                }
               >
-                {/* Using prose for potential markdown later */}
-                <p className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap">
-                  {msg.message_text}
-                </p>
-                {/* Optional: Display timestamp */}
-                {/* <span className={`text-xs block mt-1 ${msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}</span> */}
+                {/* Render mindmap if AI and resource_type is mindmap and content exists */}
+                {msg.sender === "ai" &&
+                msg.resource_type === "mindmap" &&
+                msg.content ? (
+                  <MindmapChatView content={msg.content} />
+                ) : (
+                  <p className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap">
+                    {msg.message_text}
+                  </p>
+                )}
               </div>
             </div>
           ))}
@@ -191,13 +226,100 @@ const ChatPage: React.FC = () => {
             className="flex items-center space-x-3 w-full max-w-4xl mx-auto"
           >
             <input
+              ref={inputRef}
               type="text"
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                // Show panel if last character is '@' and not already showing
+                if (e.target.value.endsWith("@")) {
+                  setShowResourcePanel(true);
+                  setResourcePanelIndex(0);
+                } else if (!e.target.value.includes("@")) {
+                  setShowResourcePanel(false);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (showResourcePanel) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setResourcePanelIndex(
+                      (prev) => (prev + 1) % resourceOptions.length
+                    );
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setResourcePanelIndex(
+                      (prev) =>
+                        (prev - 1 + resourceOptions.length) %
+                        resourceOptions.length
+                    );
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    // Insert selected resource at the position of '@'
+                    const atIdx = newMessage.lastIndexOf("@");
+                    if (atIdx !== -1) {
+                      const before = newMessage.slice(0, atIdx);
+                      const after = newMessage.slice(atIdx + 1);
+                      const newVal = `${before}@${resourceOptions[resourcePanelIndex]} ${after}`;
+                      setNewMessage(newVal);
+                      setShowResourcePanel(false);
+                      // Move cursor to after inserted resource
+                      setTimeout(() => {
+                        if (inputRef.current) {
+                          inputRef.current.selectionStart =
+                            inputRef.current.selectionEnd =
+                              before.length +
+                              resourceOptions[resourcePanelIndex].length +
+                              2;
+                          inputRef.current.focus();
+                        }
+                      }, 0);
+                    }
+                  } else if (e.key === "Escape") {
+                    setShowResourcePanel(false);
+                  }
+                }
+              }}
               placeholder="Type your message..."
               disabled={isSending}
               className="flex-grow px-4 py-2.5 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-60"
             />
+            {showResourcePanel && (
+              <div className="absolute bottom-16 left-0 w-48 bg-slate-800 border border-slate-600 rounded-lg shadow-lg z-10">
+                {resourceOptions.map((option, idx) => (
+                  <div
+                    key={option}
+                    className={`px-4 py-2 cursor-pointer ${
+                      idx === resourcePanelIndex
+                        ? "bg-indigo-600 text-white"
+                        : "text-slate-200"
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      // Insert selected resource at the position of '@'
+                      const atIdx = newMessage.lastIndexOf("@");
+                      if (atIdx !== -1) {
+                        const before = newMessage.slice(0, atIdx);
+                        const after = newMessage.slice(atIdx + 1);
+                        const newVal = `${before}@${option} ${after}`;
+                        setNewMessage(newVal);
+                        setShowResourcePanel(false);
+                        setTimeout(() => {
+                          if (inputRef.current) {
+                            inputRef.current.selectionStart =
+                              inputRef.current.selectionEnd =
+                                before.length + option.length + 2;
+                            inputRef.current.focus();
+                          }
+                        }, 0);
+                      }
+                    }}
+                  >
+                    @{option}
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               type="submit"
               disabled={isSending || !newMessage.trim()}

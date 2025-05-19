@@ -7,6 +7,7 @@ from initdb import supabase
 import os
 from openai import OpenAI, APIError
 from uuid import UUID
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -206,16 +207,8 @@ def post_chat_message(chat_id):
         abort(400, description="'message_text' is required and cannot be empty.")
     
     user_message_text = data["message_text"].strip()
-    
-    # This is a placeholder for where you'd get the current user's google_id
-    # It's CRITICAL for check_chat_ownership
-    # google_id_current_user = request.headers.get("X-Google-ID") # Example
-    # if not google_id_current_user:
-    #     abort(401, description="User authentication required.")
-    # check_chat_ownership(chat_id, google_id_current_user)
-    # For the purpose of this implementation, assuming ownership is verified elsewhere
-    # or the user_id is implicitly trusted from a secure context (e.g. session). 
-    # In a real app, this needs robust auth.
+    resource_type = data.get("resource_type", None)
+    content = None
 
     try:
         # 1. Save User's Message
@@ -234,34 +227,39 @@ def post_chat_message(chat_id):
         supabase.table("chats").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", chat_id).execute()
 
         # 3. Get AI Response (simple, no history for now)
-        # For a better chatbot, you'd fetch previous messages and include them in the prompt.
         logger.info(f"Sending to OpenAI for chat {chat_id}: '{user_message_text[:50]}...'")
         ai_response = client.chat.completions.create(
             model="gpt-3.5-turbo", # Or your preferred model
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "You are a helpful assistant which helps students learn about some topic."},
                 {"role": "user", "content": user_message_text}
             ]
         )
         ai_message_text = ai_response.choices[0].message.content
         logger.info(f"Received from OpenAI for chat {chat_id}: '{ai_message_text[:50]}...'")
 
+        # Only generate mindmap if resource_type is 'mindmap'
+        if resource_type and resource_type.lower() == 'mindmap':
+            content = json.loads(generate_mindmap_for_genie(user_message_text))
+            resource_type_val = 'mindmap'
+        else:
+            content = None
+            resource_type_val = None
+
         # 4. Save AI's Message
         ai_message_db = {
             "chat_id": chat_id,
             "sender": "ai", # From chat_sender_type ENUM
             "message_text": ai_message_text,
+            "content": content,
+            "resource_type": resource_type_val,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         ai_msg_resp = supabase.table("chat_messages").insert(ai_message_db).execute()
         if not ai_msg_resp.data:
             logger.error(f"Failed to save AI message for chat {chat_id}: {ai_msg_resp.error}")
-            # User message is saved, so don't abort entirely, but log and maybe return partial success?
-            # For now, returning the AI message if available, but DB save failed.
-            # This scenario needs careful handling in a production app.
-            return jsonify(ChatMessageBase(**ai_message_db, id=None, chat_id=UUID(chat_id)).dict()), 200 # Faking ID
+            return jsonify(ChatMessageBase(**ai_message_db, id=None, chat_id=UUID(chat_id)).dict()), 200
 
-        # Return the AI's message (the latest one)
         validated_ai_message = ChatMessageBase(**ai_msg_resp.data[0])
         return jsonify(validated_ai_message.dict()), 201
 
@@ -271,4 +269,46 @@ def post_chat_message(chat_id):
     except Exception as e:
         logger.error(f"Error posting message to chat {chat_id}: {e}")
         abort(500, description=str(e))
+
+
+
+
+def generate_mindmap_for_genie(user_prompt):
+    ''' just returns JSONB format for mindmap creation with openai client. '''
+    
+    if not client: 
+        abort(500, description="OpenAI client not initialized due to missing API key.")
+        
+        
+        
+    system_prompt = (
+                "You are an expert mind map editor. You will be given an existing mind map structure (nodes and edges in JSON format) and a prompt. "
+                "Your task is to enhance or add to the existing mind map based on the user's prompt. "
+                "You can add new nodes, connect them to existing nodes, add connections between existing nodes, or potentially modify existing node labels if it makes sense based on the prompt. "
+                "Output ONLY the *complete, updated* mind map structure as a JSON object containing two keys: 'nodes' and 'edges'. "
+                "Follow the exact same JSON format requirements as the generation prompt (unique string IDs for nodes/edges, position object, data.label, edge format 'e[source]-[target]'). "
+                "Ensure all original nodes and edges that should remain are included in your output, along with any additions or modifications. Keep existing node IDs where possible. Generate new unique IDs for new nodes/edges. "
+                "Example node: { id: 'existing_id_1', position: { x: 0, y: 0 }, data: { label: 'Modified Label' } }"
+                "Example new node: { id: 'new_node_abc', position: { x: 0, y: 0 }, data: { label: 'New Concept' } }"
+                "Example edge: { id: 'eexisting_id_1-new_node_abc', source: 'existing_id_1', target: 'new_node_abc' }"
+                "Do not include any explanations or introductory text outside the final JSON object."
+            )
+    
+    completion = client.chat.completions.create(
+            model="gpt-4o", # Using a potentially stronger model for editing tasks
+            response_format={ "type": "json_object" },
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.6, # Slightly higher temp might be good for creative enhancement
+            max_tokens=3072 # Allow more tokens for potentially larger combined structures
+        )
+
+    mindmap_json_string = completion.choices[0].message.content
+    logger.info("OpenAI response received.")
+    
+    return mindmap_json_string
+        
+    
 
