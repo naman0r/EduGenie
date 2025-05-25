@@ -5,12 +5,16 @@
 - [ ] bro lock tf in
 - [ ] finish the task pending/in progress/completed/overdue eg on class view page to actually do something (produces an error now. ) [ could not do this idk why some supabase error will figure it out later]
 - [ ] chatbot functionality:
+
   - [ ] add support for genies to generate and show videos (not really sure how i'm going to store them in supabase, probably have to host them somewhere. idk where tho.)
   - [ ] IDEA: when user says find me a video on XXXX, I can implement a web search for a youtube video or something (beyond the scope of just openai api call.)
   - [ ] implementation of @calendar_event in genie and use of the Google Calendar API to do it.
   - [ ] full implementation ad
+  - [ ] need to integrate Dagre with React flow renderer in mindmapchatview component because the lines look really wonky. Also allow the user to 'save' the mindmap as a resource (will save to a specific class).
+  - [ ] redesign visual and functionality of the genie view page. (make it look clean and professional)
+  - [ ] brainstorm more unique functionality I can bring to this chatbot
 
-<hr/>
+  <hr/>
 
 - [ ] @naman rebranding from eduGenie to something else.
 

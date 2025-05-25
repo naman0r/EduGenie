@@ -31,7 +31,13 @@ const ChatPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showResourcePanel, setShowResourcePanel] = useState(false);
   const [resourcePanelIndex, setResourcePanelIndex] = useState(0);
-  const resourceOptions = ["mindmap", "flashcard", "quiz", "summary"];
+  const resourceOptions = [
+    "mindmap",
+    "flashcard",
+    "quiz",
+    "summary",
+    "Calendar Event",
+  ];
   const inputRef = useRef<HTMLInputElement>(null);
 
   // --- Helper: Scroll to bottom ---
@@ -87,7 +93,7 @@ const ChatPage: React.FC = () => {
     if (mindmapRegex.test(userMessageText)) {
       resourceType = "mindmap";
       // Remove the annotation from the message text
-      userMessageText = userMessageText.replace(mindmapRegex, "").trim();
+      userMessageText = userMessageText.replace(mindmapRegex, "mindmap").trim();
     }
 
     setNewMessage(""); // Clear input immediately
