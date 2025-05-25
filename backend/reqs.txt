@@ -89,14 +89,14 @@ propcache==0.3.0
 proto-plus==1.26.0
 protobuf==5.29.3
 psycopg2-binary==2.9.10
-pyasn1==0.6.1
+pyasn1==0.4.8
 pyasn1_modules==0.4.1
 pycparser==2.22
 pydantic==2.10.6
 pydantic_core==2.27.2
 pydub==0.25.1
 Pygments==2.19.1
-PyJWT==2.9.0
+PyJWT>=2.5.0,<2.10.0
 pyparsing==3.2.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
