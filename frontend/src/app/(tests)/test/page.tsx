@@ -18,6 +18,8 @@ const TestPage = () => {
     fetchClassesError,
     refreshData,
     addClass,
+    isGoogleCalendarIntegrated,
+    isCanvasIntegrated,
   } = useAuth(); // this is all the potential data we da
 
   const { user, classDetails, error, isAuthorized } = useClassDetails(
@@ -36,6 +38,7 @@ const TestPage = () => {
     if (user) {
       fetchResources(user);
       fetchTasks(user);
+      refreshData();
     }
   }, [user, fetchResources]);
 
@@ -55,13 +58,19 @@ const TestPage = () => {
       <p>error: {JSON.stringify(error)}</p>
       <p>is authorized: {JSON.stringify(isAuthorized)}</p> */}
 
-      <h1>Test page</h1>
+      {/* <h1>Test page</h1>
       <p>tasks: {JSON.stringify(tasks)}</p>
       <p>tasks loading: {JSON.stringify(tasksLoading)}</p>
       <p>tasks error: {JSON.stringify(tasksError)}</p>
       <p>resources: {JSON.stringify(resources)}</p>
       <p>resources loading: {JSON.stringify(resourcesLoading)}</p>
-      <p>resources error: {JSON.stringify(resourcesError)}</p>
+      <p>resources error: {JSON.stringify(resourcesError)}</p> */}
+      <h1>Test page</h1>
+      <p>
+        is google calendar integrated: {isGoogleCalendarIntegrated && "true"}
+      </p>
+      <p>is canvas integrated: {isCanvasIntegrated && "true"}</p>
+      <p>user profile: {JSON.stringify(userProfile)}</p>
     </div>
   );
 };

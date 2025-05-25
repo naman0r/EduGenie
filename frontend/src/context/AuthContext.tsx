@@ -34,6 +34,8 @@ interface AuthContextType {
   isLoadingClasses: boolean;
   authError: string | null;
   fetchClassesError: string | null;
+  isGoogleCalendarIntegrated: boolean;
+  isCanvasIntegrated: boolean;
   refreshData: () => Promise<void>;
   addClass: (classDetails: AddClassServicePayload) => Promise<ClassData>;
 }
@@ -50,6 +52,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [fetchClassesError, setFetchClassesError] = useState<string | null>(
     null
+  );
+
+  // Determine if user has integrated Google Calendar and Canvas
+  const isGoogleCalendarIntegrated = Boolean(userProfile?.google_refresh_token);
+  const isCanvasIntegrated = Boolean(
+    userProfile?.canvas_access_token && userProfile?.canvas_domain
   );
 
   const loadUserData = useCallback(async (currentUser: FirebaseUser) => {
@@ -139,6 +147,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         fetchClassesError,
         refreshData,
         addClass,
+        isGoogleCalendarIntegrated,
+        isCanvasIntegrated,
       }}
     >
       {children}
