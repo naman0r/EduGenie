@@ -78,13 +78,13 @@ const MindmapChatView: React.FC<MindmapChatViewProps> = ({ content }) => {
         nodes={layoutedNodes}
         edges={safeEdges}
         fitView
-        panOnDrag={false}
+        panOnDrag={true}
         zoomOnScroll={false}
-        zoomOnPinch={false}
+        zoomOnPinch={true}
         zoomOnDoubleClick={false}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
+        nodesDraggable={true}
+        nodesConnectable={true}
+        elementsSelectable={true}
         className="bg-slate-900 rounded-lg border border-slate-700"
       >
         <Background gap={16} size={1} color="#334155" />

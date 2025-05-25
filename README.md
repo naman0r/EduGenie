@@ -9,3 +9,11 @@ Hi! I am Naman and i'm the developer behind EduGenie. So far what we have done:
 - Chat feature: able to generate Short videos (around a minute) on any topic the user prompts
 - Supabase Schema set up for the future
 - Flask for backend, NextJs for frontend.
+
+# potential names:
+
+-Meridian - The highest point or culmination of knowledge
+
+- cadence
+  Tether -
+-

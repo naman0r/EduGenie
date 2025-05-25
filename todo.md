@@ -2,6 +2,16 @@
 
 ## Priority 1:
 
+- [ ] bro lock tf in
+- [ ] finish the task pending/in progress/completed/overdue eg on class view page to actually do something (produces an error now. ) [ could not do this idk why some supabase error will figure it out later]
+- [ ] chatbot functionality:
+  - [ ] add support for genies to generate and show videos (not really sure how i'm going to store them in supabase, probably have to host them somewhere. idk where tho.)
+  - [ ] IDEA: when user says find me a video on XXXX, I can implement a web search for a youtube video or something (beyond the scope of just openai api call.)
+  - [ ] implementation of @calendar_event in genie and use of the Google Calendar API to do it.
+  - [ ] full implementation ad
+
+<hr/>
+
 - [ ] @naman rebranding from eduGenie to something else.
 
 - [ ] @som: finish restructuring the code and design for frontend by FRIDAY may 23rd.

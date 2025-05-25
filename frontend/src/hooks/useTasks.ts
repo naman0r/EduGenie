@@ -46,32 +46,52 @@ export const useTasks = (classId: string) => {
   ) => {
     if (!user || !classId) return;
 
+    // Optimistically update the UI
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId ? { ...task, status: newStatus as any } : task
+      )
+    );
+
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/classes/${classId}/tasks/${taskId}/status`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/canvas/tasks/${taskId}/status`, // Corrected endpoint
         {
-          method: "OPTIONS",
+          method: "PUT", // Changed to PUT
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             google_id: user.uid,
-            status: newStatus,
+            status: newStatus, // Ensure this matches what backend expects, e.g., 'status'
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to update task status: ${response.status}`);
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Failed to parse error response" }));
+        throw new Error(
+          `Failed to update task status: ${response.status} - ${
+            errorData.error || response.statusText
+          }`
+        );
       }
-
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task.id === taskId ? { ...task, status: newStatus as any } : task
-        )
-      );
+      // Optionally, re-fetch tasks or update based on response if backend returns the updated task
+      // For now, relying on optimistic update. If backend returns updated task:
+      // const updatedTask = await response.json();
+      // setTasks((prevTasks) =>
+      //  prevTasks.map((task) =>
+      //    task.id === taskId ? updatedTask : task
+      //  )
+      // );
+      console.log("Task status updated successfully");
     } catch (err: any) {
       console.error("Failed to update task status:", err);
+      setTasksError(err.message || "Failed to update task. Please try again.");
+      // Revert optimistic update on error
+      fetchTasks(user); // Or store original state and revert
     }
   };
 

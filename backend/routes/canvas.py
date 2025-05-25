@@ -400,3 +400,72 @@ def get_class_tasks(class_id):
     except Exception as e:
         logger.error(f"Database error fetching tasks: {e}")
         return jsonify({"error": "Database error"}), 500
+
+@bp.route('/canvas/tasks/<string:task_id>/status', methods=['PUT'])
+def update_task_status(task_id):
+    """Update the status of a specific task."""
+    data = request.json
+    google_id = data.get('google_id')
+    new_status = data.get('status')
+
+    logger.info(f"Attempting to update task {task_id} to status: '{new_status}' for user {google_id}")
+
+    if not google_id:
+        return jsonify({"error": "User identifier (google_id) is required"}), 400
+    
+    if not new_status:
+        return jsonify({"error": "New status is required"}), 400
+    
+    if not task_id:
+        return jsonify({"error": "Task ID is required"}), 400
+
+    try:
+        # First, verify the task exists and belongs to the user
+        task_check_res = (supabase.table('tasks')
+                                .select('id, user_id')
+                                .eq('id', task_id)
+                                .eq('user_id', google_id)
+                                .single()
+                                .execute())
+
+        if not task_check_res.data:
+            return jsonify({"error": "Task not found or user not authorized"}), 404
+
+        # Update the task status
+        update_res = (supabase.table('tasks')
+                            .update({'status': new_status})
+                            .eq('id', task_id)
+                            .eq('user_id', google_id) # Ensure only the owner can update
+                            .execute())
+
+        if update_res.data:
+            # Optionally, return the updated task or just a success message
+            # For simplicity, returning the first updated record
+            # Ensure your frontend can handle if this returns a list or a single object
+            # based on your Supabase client version and usage.
+            # Assuming .execute() on update returns a list of updated records.
+            return jsonify(update_res.data[0]), 200
+        else:
+            # This case might indicate the record wasn't updated,
+            # potentially due to postgrest returning no content on successful update with certain settings
+            # or if the conditions weren't met (though 'task_check_res' should catch user mismatch).
+            # If Supabase returns an empty list on successful update with `returning='minimal'`,
+            # this might be misinterpreted as an error.
+            # Consider checking update_res.error or status codes from Supabase if applicable.
+            # For now, we assume if task_check_res passed, the update should succeed.
+            # A more robust check might involve re-fetching the task or ensuring `returning='representation'`.
+            # Let's assume data will be present on successful update for now.
+            logger.warning(f"Task status update for task {task_id} by user {google_id} returned no data.")
+            # If your Supabase setup returns data upon successful update:
+            # return jsonify({"error": "Failed to update task status, no data returned"}), 500
+            # If it might return empty data on success (e.g. with `Prefer: return=minimal`):
+            return jsonify({"message": "Task status updated successfully (no data returned)"}), 200
+
+
+    except Exception as e:
+        logger.error(f"Database error updating task {task_id} status: {e}")
+        # Check for specific Supabase errors if possible, e.g., PgrstError
+        # from supabase.lib.client_options import PgrstError
+        # if isinstance(e, PgrstError):
+        #     return jsonify({"error": f"Supabase error: {e.message}"}), 500
+        return jsonify({"error": "Database operation failed"}), 500
