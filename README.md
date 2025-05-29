@@ -17,3 +17,11 @@ Hi! I am Naman and i'm the developer behind EduGenie. So far what we have done:
 - cadence
   Tether -
 -
+
+* axiom:
+  axiomai.space -> namecheap domain available for cheap.
+  axiomai.vercel.app taken
+
+* quivelai
+* cascadeai
+*

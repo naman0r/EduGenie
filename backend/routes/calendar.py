@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, abort, redirect
+from flask_cors import CORS
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
@@ -17,6 +18,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('calendar', __name__)
+
+CORS(bp)
 
 CLIENT_SECRETS_FILE = 'client_secret_377799709353-3e316d1al2o05ju3k84ip6ud0hfu3p7l.apps.googleusercontent.com.json'
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']

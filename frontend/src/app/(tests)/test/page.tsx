@@ -22,25 +22,12 @@ const TestPage = () => {
     isCanvasIntegrated,
   } = useAuth(); // this is all the potential data we da
 
-  const { user, classDetails, error, isAuthorized } = useClassDetails(
-    "19fbdd8b-e037-4506-81cb-3963c0035bf6"
-  );
-
-  const { tasks, tasksLoading, tasksError, fetchTasks } = useTasks(
-    "19fbdd8b-e037-4506-81cb-3963c0035bf6"
-  );
-
-  const { resources, resourcesLoading, resourcesError, fetchResources } =
-    useResources("19fbdd8b-e037-4506-81cb-3963c0035bf6");
-
   // still need to call these functions.....
   useEffect(() => {
-    if (user) {
-      fetchResources(user);
-      fetchTasks(user);
+    if (firebaseUser) {
       refreshData();
     }
-  }, [user, fetchResources]);
+  }, [firebaseUser]);
 
   return (
     <div className="pt-35">

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, FormEvent } from "react";
 import { useParams } from "next/navigation"; // To get ID from URL
 import dynamic from "next/dynamic";
+import { useAuth } from "@/context/AuthContext"; // Added
 
 interface ChatMessage {
   id: string; // UUID
@@ -28,6 +29,8 @@ const ChatPage: React.FC = () => {
   const params = useParams();
   const chatId = params.id as string; // Get chat ID from route
 
+  const { firebaseUser, isGoogleCalendarIntegrated } = useAuth(); // Added
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showResourcePanel, setShowResourcePanel] = useState(false);
   const [resourcePanelIndex, setResourcePanelIndex] = useState(0);
@@ -36,7 +39,7 @@ const ChatPage: React.FC = () => {
     "flashcard",
     "quiz",
     "summary",
-    "Calendar Event",
+    "calendar event",
   ];
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -85,16 +88,8 @@ const ChatPage: React.FC = () => {
     event.preventDefault();
     if (!newMessage.trim() || isSending) return;
 
-    let userMessageText = newMessage.trim();
-    let resourceType: string | null = null;
-
-    // Detect @mindmap annotation (case-insensitive, word boundary)
-    const mindmapRegex = /@mindmap\b/i;
-    if (mindmapRegex.test(userMessageText)) {
-      resourceType = "mindmap";
-      // Remove the annotation from the message text
-      userMessageText = userMessageText.replace(mindmapRegex, "mindmap").trim();
-    }
+    const originalUserMessage = newMessage.trim();
+    console.log("[DEBUG] Original User Message:", originalUserMessage); // DEBUG
 
     setNewMessage(""); // Clear input immediately
     setIsSending(true);
@@ -105,16 +100,198 @@ const ChatPage: React.FC = () => {
       id: crypto.randomUUID(), // Temporary client-side ID
       chat_id: chatId,
       sender: "user",
-      message_text: userMessageText,
+      message_text: originalUserMessage,
       resource_type: null,
       content: null,
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimisticUserMessage]);
-
-    // Wait a tick for the state update and then scroll
     setTimeout(scrollToBottom, 0);
 
+    // Calendar event command regex: @calendar event <SUMMARY> from <HH:MM AM/PM> to <HH:MM AM/PM> on <YYYY-MM-DD>
+    const calendarCmdRegex =
+      /@calendar\s+event\s+(.+?)\s+from\s+(\d{1,2}:\d{2}\s*[AP]M)\s+to\s+(\d{1,2}:\d{2}\s*[AP]M)\s+on\s+(\d{4}-\d{2}-\d{2})/i;
+
+    console.log(
+      "[DEBUG] Regex Test:",
+      calendarCmdRegex.test(originalUserMessage)
+    ); // DEBUG
+    const calendarMatch = originalUserMessage.match(calendarCmdRegex);
+    console.log("[DEBUG] Calendar Match Object:", calendarMatch); // DEBUG
+
+    if (calendarMatch) {
+      console.log(
+        "[DEBUG] Matched calendar command. Proceeding with calendar logic."
+      ); // DEBUG
+      console.log(
+        "[DEBUG] isGoogleCalendarIntegrated:",
+        isGoogleCalendarIntegrated
+      ); // DEBUG
+      console.log(
+        "[DEBUG] firebaseUser:",
+        firebaseUser ? firebaseUser.uid : "null"
+      ); // DEBUG
+
+      if (!isGoogleCalendarIntegrated || !firebaseUser) {
+        console.log("[DEBUG] Calendar not integrated or user not logged in."); // DEBUG
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          chat_id: chatId,
+          sender: "ai",
+          message_text:
+            "Please connect your Google Calendar through your profile page first and ensure you are logged in.",
+          resource_type: null,
+          content: null,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+        setIsSending(false);
+        return;
+      }
+
+      const [, summary, startTimeStr, endTimeStr, dateStr] = calendarMatch;
+
+      const parseDateTime = (
+        dateString: string,
+        timeString: string
+      ): string | null => {
+        const [time, modifier] = timeString.split(" ");
+        let [hours, minutes] = time.split(":").map(Number);
+
+        if (modifier && modifier.toUpperCase() === "PM" && hours < 12)
+          hours += 12;
+        if (modifier && modifier.toUpperCase() === "AM" && hours === 12)
+          hours = 0; // Midnight case
+
+        if (isNaN(hours) || isNaN(minutes) || hours > 23 || minutes > 59)
+          return null;
+
+        const dateObj = new Date(dateString);
+        if (isNaN(dateObj.getTime())) return null; // Invalid dateStr
+
+        dateObj.setHours(hours, minutes, 0, 0);
+
+        // Format to YYYY-MM-DDTHH:MM:SS
+        const pad = (num: number) => num.toString().padStart(2, "0");
+        return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(
+          dateObj.getDate()
+        )}T${pad(hours)}:${pad(minutes)}:00`;
+      };
+
+      const start_datetime = parseDateTime(dateStr, startTimeStr);
+      const end_datetime = parseDateTime(dateStr, endTimeStr);
+      console.log("[DEBUG] Parsed Start DateTime:", start_datetime); // DEBUG
+      console.log("[DEBUG] Parsed End DateTime:", end_datetime); // DEBUG
+
+      if (!start_datetime || !end_datetime) {
+        console.log("[DEBUG] Invalid date/time format after parsing."); // DEBUG
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          chat_id: chatId,
+          sender: "ai",
+          message_text:
+            "Invalid date/time format. Please use: @calendar event SUMMARY from HH:MM AM/PM to HH:MM AM/PM on YYYY-MM-DD",
+          resource_type: null,
+          content: null,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+        setIsSending(false);
+        return;
+      }
+
+      // Check if start time is before end time
+      if (new Date(start_datetime) >= new Date(end_datetime)) {
+        console.log("[DEBUG] Start time is not before end time."); // DEBUG
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          chat_id: chatId,
+          sender: "ai",
+          message_text: "Event start time must be before the end time.",
+          resource_type: null,
+          content: null,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+        setIsSending(false);
+        return;
+      }
+
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        if (!backendUrl) {
+          console.error("[DEBUG] Backend URL not set."); // DEBUG
+          throw new Error("Backend URL not set.");
+        }
+        console.log("[DEBUG] Attempting to call calendar API endpoint."); // DEBUG
+
+        const response = await fetch(
+          `${backendUrl}/calendar/users/${firebaseUser.uid}/calendar/events`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ summary, start_datetime, end_datetime }),
+          }
+        );
+
+        const responseData = await response.json(); // Always try to parse JSON
+        console.log("[DEBUG] Calendar API Response Data:", responseData); // DEBUG
+
+        if (!response.ok) {
+          const errorDetails =
+            responseData.description ||
+            responseData.message ||
+            `HTTP error ${response.status}`;
+          console.error("[DEBUG] Calendar API Error:", errorDetails); // DEBUG
+          throw new Error(errorDetails);
+        }
+
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          chat_id: chatId,
+          sender: "ai",
+          message_text: `Calendar event '${summary}' created successfully!`,
+          resource_type: null,
+          content: null,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      } catch (err: any) {
+        console.error("[DEBUG] Error in calendar processing block:", err); // DEBUG
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          chat_id: chatId,
+          sender: "ai",
+          message_text: `Failed to create calendar event: ${
+            err.message || "Unknown error"
+          }`,
+          resource_type: null,
+          content: null,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      } finally {
+        setIsSending(false);
+      }
+      return; // Calendar event handled, stop further processing
+    }
+    console.log(
+      "[DEBUG] Did not match calendar command. Proceeding with OpenAI logic."
+    ); // DEBUG
+
+    // --- Existing OpenAI/Resource Message Submission Logic ---
+    let userMessageText = originalUserMessage; // Use the original message for AI
+    let resourceType: string | null = null;
+
+    // Detect @mindmap annotation (case-insensitive, word boundary)
+    const mindmapRegex = /@mindmap\\b/i;
+    if (mindmapRegex.test(userMessageText)) {
+      resourceType = "mindmap";
+      // Remove the annotation from the message text
+      userMessageText = userMessageText.replace(mindmapRegex, "mindmap").trim();
+    }
+
+    // If no specific command handled above, proceed to call AI
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) throw new Error("Backend URL not set.");
@@ -128,7 +305,7 @@ const ChatPage: React.FC = () => {
         body: JSON.stringify(body),
       });
 
-      const responseText = await response.text(); // Read response body once
+      const responseText = await response.text();
 
       if (!response.ok) {
         let errorDetails = responseText;
@@ -145,15 +322,11 @@ const ChatPage: React.FC = () => {
       }
 
       const aiMessage: ChatMessage = JSON.parse(responseText);
-
-      console.log("AI resource_type:", aiMessage.resource_type);
-      console.log("AI content:", aiMessage.content);
-
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err: any) {
       setError(err.message || "An error occurred sending the message.");
       console.error("Send Message Error:", err);
-      // Optional: Remove optimistic message on error
+      // Remove optimistic user message on actual error
       setMessages((prev) =>
         prev.filter((m) => m.id !== optimisticUserMessage.id)
       );
