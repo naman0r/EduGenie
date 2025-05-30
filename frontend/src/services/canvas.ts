@@ -36,3 +36,16 @@ export const disconnectCanvas = async (googleId: string): Promise<any> => {
     body: JSON.stringify(payload),
   });
 };
+
+export const getAllUpcomingAssignments = async (
+  googleId: string
+): Promise<any> => {
+  return fetchAPI(
+    `${API_BASE_URL}/canvas/assignments?google_id=${encodeURIComponent(
+      googleId
+    )}`,
+    {
+      method: "GET",
+    }
+  );
+};

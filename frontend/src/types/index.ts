@@ -3,6 +3,8 @@ export * from "./credits";
 export * from "./class";
 export * from "./resources";
 export * from "./task";
+export * from "./assignment";
+export * from "./calendar";
 // Add other type exports here if new files are created, e.g.:
 // export * from './exam';
 

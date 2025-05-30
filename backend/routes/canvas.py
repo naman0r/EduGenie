@@ -469,3 +469,127 @@ def update_task_status(task_id):
         # if isinstance(e, PgrstError):
         #     return jsonify({"error": f"Supabase error: {e.message}"}), 500
         return jsonify({"error": "Database operation failed"}), 500
+
+@bp.route('/canvas/assignments', methods=['GET'])
+def get_all_upcoming_assignments():
+    """Fetch upcoming assignments from all Canvas courses for the user."""
+    google_id = request.args.get('google_id')
+    
+    if not google_id:
+        return jsonify({"error": "User identifier (google_id) is required as query parameter"}), 400
+    
+    # Get Canvas credentials
+    try:
+        res = (supabase.table('users')
+                        .select('canvas_domain, canvas_access_token')
+                        .eq('google_id', google_id)
+                        .single()
+                        .execute())
+        
+        if res.data is None:
+            logger.error(f"Error fetching Canvas credentials for {google_id}")
+            return jsonify({"error": "User not found or not connected to Canvas"}), 404
+        
+        row = res.data
+        token = row.get('canvas_access_token')
+        domain = row.get('canvas_domain')
+        
+        if not token or not domain:
+            return jsonify({"error": "Canvas credentials not found"}), 400
+        
+    except Exception as e:
+        logger.error(f"Database error fetching Canvas credentials: {e}")
+        return jsonify({"error": "Database error"}), 500
+    
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # First, get all active courses
+    try:
+        courses_url = f"{domain}/api/v1/courses"
+        courses_params = {"enrollment_state": "active"}
+        
+        courses = []
+        while courses_url:
+            resp = requests.get(courses_url, headers=headers, params=courses_params, timeout=10)
+            if resp.status_code != 200:
+                logger.warning(f"Canvas API error fetching courses {resp.status_code}: {resp.text[:200]}")
+                return jsonify({"error": "Canvas API error fetching courses",
+                                "details": resp.text}), resp.status_code
+
+            courses.extend(resp.json())
+            courses_url = resp.links.get('next', {}).get('url')
+            courses_params = None
+        
+    except requests.exceptions.RequestException as e:
+        logger.exception("Network error reaching Canvas for courses")
+        return jsonify({"error": "Could not reach Canvas for courses"}), 502
+    
+    # Now fetch assignments from all courses
+    all_assignments = []
+    
+    for course in courses:
+        course_id = course.get('id')
+        course_name = course.get('name', 'Unknown Course')
+        
+        try:
+            assignments_url = f"{domain}/api/v1/courses/{course_id}/assignments"
+            assignments_params = {"bucket": "upcoming", "order_by": "due_at"}
+            
+            assignments = []
+            retry_count = 0
+            max_retries = 2
+            
+            while assignments_url and retry_count <= max_retries:
+                try:
+                    resp = requests.get(assignments_url, headers=headers, params=assignments_params, timeout=10)
+                    
+                    if resp.status_code == 200:
+                        page_assignments = resp.json()
+                        assignments.extend(page_assignments)
+                        assignments_url = resp.links.get('next', {}).get('url')
+                        assignments_params = None
+                        retry_count = 0
+                    else:
+                        logger.warning(f"Canvas API error for course {course_id}: {resp.status_code}: {resp.text[:200]}")
+                        if retry_count < max_retries:
+                            retry_count += 1
+                            logger.info(f"Retrying Canvas API request for course {course_id} (attempt {retry_count}/{max_retries})")
+                            time.sleep(1)
+                        else:
+                            # Log error but continue with other courses
+                            logger.error(f"Failed to fetch assignments for course {course_id} after {max_retries} retries")
+                            break
+                
+                except requests.exceptions.Timeout:
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        logger.info(f"Canvas API request timed out for course {course_id}, retrying (attempt {retry_count}/{max_retries})")
+                        time.sleep(1)
+                    else:
+                        logger.error(f"Canvas API request timed out for course {course_id} after {max_retries} retries")
+                        break
+            
+            # Process and add course assignments
+            for assignment in assignments:
+                processed_assignment = {
+                    "id": assignment.get("id"),
+                    "title": assignment.get("name"),
+                    "description": assignment.get("description"),
+                    "due_date": assignment.get("due_at"),
+                    "html_url": assignment.get("html_url"),
+                    "submission_types": assignment.get("submission_types"),
+                    "points_possible": assignment.get("points_possible"),
+                    "course_id": course_id,
+                    "course_name": course_name
+                }
+                all_assignments.append(processed_assignment)
+        
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Network error fetching assignments for course {course_id}: {e}")
+            # Continue with other courses
+            continue
+    
+    # Sort assignments by due date (upcoming first)
+    all_assignments.sort(key=lambda x: x['due_date'] if x['due_date'] else '9999-12-31T23:59:59Z')
+    
+    return jsonify(all_assignments), 200

@@ -12,6 +12,7 @@ from googleapiclient.errors import HttpError
 import json
 from initdb import supabase
 import os
+import pytz
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -114,11 +115,20 @@ def add_calendar_event(google_id):
     try:
         ev = CalendarEventCreate(**data)
         service = get_google_calendar_client(google_id)
+        
+        # Add timezone information to the datetime strings
+        # Google Calendar API requires timezone info for dateTime fields
         body = {
             'summary': ev.summary,
             'description': ev.description,
-            'start': {'dateTime': ev.start_datetime},
-            'end': {'dateTime': ev.end_datetime}
+            'start': {
+                'dateTime': ev.start_datetime,
+                'timeZone': 'America/Los_Angeles'  # Default to PST/PDT, could be made configurable
+            },
+            'end': {
+                'dateTime': ev.end_datetime,
+                'timeZone': 'America/Los_Angeles'  # Default to PST/PDT, could be made configurable
+            }
         }
         created = service.events().insert(calendarId='primary', body=body).execute()
         return jsonify({"message":"Event created successfully", "event_details": created}), 201
@@ -129,6 +139,63 @@ def add_calendar_event(google_id):
         abort(code, description=msg)
     except Exception as e:
         logger.error(f"Error creating event: {e}")
+        abort(500, description=str(e))
+
+@bp.route('/users/<string:google_id>/calendar/events', methods=['GET'])
+def get_calendar_events(google_id):
+    """Fetch upcoming events from the user's Google Calendar."""
+    try:
+        service = get_google_calendar_client(google_id)
+        
+        # Get events from now onwards
+        now = datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+        
+        # Get upcoming events (max 50 to avoid overwhelming the UI)
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=now,
+            maxResults=50,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        # Process events to match our expected format
+        processed_events = []
+        for event in events:
+            # Handle all-day events vs timed events
+            start_time = event['start'].get('dateTime')
+            if not start_time:
+                start_time = event['start'].get('date')
+            
+            end_time = event['end'].get('dateTime')
+            if not end_time:
+                end_time = event['end'].get('date')
+            
+            processed_event = {
+                'id': event.get('id'),
+                'summary': event.get('summary', 'No Title'),
+                'description': event.get('description', ''),
+                'start': start_time,
+                'end': end_time,
+                'html_link': event.get('htmlLink'),
+                'location': event.get('location', ''),
+                'creator': event.get('creator', {}),
+                'attendees': event.get('attendees', []),
+                'is_all_day': 'date' in event['start']  # True if all-day event
+            }
+            processed_events.append(processed_event)
+        
+        return jsonify(processed_events), 200
+        
+    except HttpError as err:
+        code = err.resp.status
+        msg = err._get_reason()
+        logger.error(f"Google Calendar API error {code}: {msg}")
+        abort(code, description=msg)
+    except Exception as e:
+        logger.error(f"Error fetching calendar events: {e}")
         abort(500, description=str(e))
 
 # Helper function to get Google Calendar client

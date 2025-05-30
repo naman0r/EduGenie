@@ -9,7 +9,7 @@ export const initiateGoogleCalendarAuth = (googleId: string): void => {
 
 interface CalendarEventData {
   summary: string;
-  description: string;
+  description?: string;
   start_datetime: string;
   end_datetime: string;
 }
@@ -21,5 +21,13 @@ export const createGoogleCalendarTestEvent = async (
   return fetchAPI(`${API_BASE_URL}/users/${googleId}/calendar/events`, {
     method: "POST",
     body: JSON.stringify(eventData),
+  });
+};
+
+export const getGoogleCalendarEvents = async (
+  googleId: string
+): Promise<any> => {
+  return fetchAPI(`${API_BASE_URL}/users/${googleId}/calendar/events`, {
+    method: "GET",
   });
 };
