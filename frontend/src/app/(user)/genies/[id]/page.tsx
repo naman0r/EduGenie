@@ -39,6 +39,7 @@ const ChatPage: React.FC = () => {
     "flashcard",
     "quiz",
     "summary",
+    "video",
     "calendar event",
   ];
   const inputRef = useRef<HTMLInputElement>(null);
@@ -295,6 +296,18 @@ const ChatPage: React.FC = () => {
       }
     }
 
+    // Detect @video annotation (case-insensitive, word boundary)
+    const videoRegex = /@video\b/i;
+    if (videoRegex.test(userMessageText)) {
+      resourceType = "video";
+      // Remove the @video annotation from the message text
+      userMessageText = userMessageText.replace(videoRegex, "").trim();
+      // If the message becomes empty after removing @video, provide a default prompt
+      if (!userMessageText) {
+        userMessageText = "Create a video explanation";
+      }
+    }
+
     // If no specific command handled above, proceed to call AI
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -372,7 +385,8 @@ const ChatPage: React.FC = () => {
                 }`}
                 style={
                   msg.sender === "ai" &&
-                  msg.resource_type === "mindmap" &&
+                  (msg.resource_type === "mindmap" ||
+                    msg.resource_type === "video") &&
                   msg.content
                     ? { width: "100%", height: "400px", minWidth: "300px" }
                     : {}
@@ -383,6 +397,27 @@ const ChatPage: React.FC = () => {
                 msg.resource_type === "mindmap" &&
                 msg.content ? (
                   <MindmapChatView content={msg.content} />
+                ) : msg.sender === "ai" &&
+                  msg.resource_type === "video" &&
+                  msg.content ? (
+                  /* Render video if AI and resource_type is video and content exists */
+                  <div className="w-full h-full">
+                    <div className="mb-2">
+                      <h3 className="text-sm font-semibold text-slate-300">
+                        Generated Video:
+                      </h3>
+                    </div>
+                    <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
+                      <video
+                        controls
+                        src={msg.content.video_url || msg.content.url}
+                        className="w-full h-full"
+                        preload="metadata"
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  </div>
                 ) : (
                   <p className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap">
                     {msg.message_text}
