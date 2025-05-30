@@ -17,6 +17,7 @@ const CalendarPage: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [createEventError, setCreateEventError] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   // Form state
   const [formData, setFormData] = useState({
@@ -52,47 +53,63 @@ const CalendarPage: React.FC = () => {
     fetchEvents();
   }, [firebaseUser, isGoogleCalendarIntegrated]);
 
-  const formatEventDate = (dateString: string, isAllDay: boolean): string => {
-    const date = new Date(dateString);
+  // Calendar helper functions
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
 
-    if (isAllDay) {
-      return date.toLocaleDateString("en-US", {
-        weekday: "short",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    }
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
 
-    return date.toLocaleString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
+  const formatDateKey = (date: Date) => {
+    return date.toISOString().split("T")[0];
+  };
+
+  const getEventsForDate = (date: Date) => {
+    const dateKey = formatDateKey(date);
+    return events.filter((event) => {
+      const eventDate = new Date(event.start);
+      const eventDateKey = formatDateKey(eventDate);
+      return eventDateKey === dateKey;
     });
   };
 
-  const getEventTimeColor = (startString: string): string => {
-    const eventDate = new Date(startString);
-    const now = new Date();
-    const diffTime = eventDate.getTime() - now.getTime();
-    const diffHours = diffTime / (1000 * 60 * 60);
+  const navigateMonth = (direction: "prev" | "next") => {
+    setCurrentDate((prev) => {
+      const newDate = new Date(prev);
+      if (direction === "prev") {
+        newDate.setMonth(prev.getMonth() - 1);
+      } else {
+        newDate.setMonth(prev.getMonth() + 1);
+      }
+      return newDate;
+    });
+  };
 
-    if (diffHours < 0) {
-      return "text-gray-500"; // Past event
-    } else if (diffHours <= 2) {
-      return "text-red-400"; // Very soon
-    } else if (diffHours <= 24) {
-      return "text-orange-400"; // Today
-    } else if (diffHours <= 168) {
-      // 7 days
-      return "text-yellow-400"; // This week
-    } else {
-      return "text-green-400"; // Later
+  const generateCalendarDays = () => {
+    const daysInMonth = getDaysInMonth(currentDate);
+    const firstDay = getFirstDayOfMonth(currentDate);
+    const days = [];
+
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
     }
+
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(
+        new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
+      );
+    }
+
+    return days;
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -204,104 +221,124 @@ const CalendarPage: React.FC = () => {
     );
   }
 
+  const calendarDays = generateCalendarDays();
+  const monthYear = currentDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
   return (
-    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16  md:pt-35">
+    <div className="min-h-screen bg-black/[0.96] text-white pt-20 px-4 md:px-8 lg:px-16 md:pt-35 md:pb-20">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Your Calendar</h1>
         <div className="flex items-center space-x-4">
-          <div className="text-sm text-gray-400">
-            {events.length} upcoming events
+          <h1 className="text-3xl font-bold">Calendar</h1>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => navigateMonth("prev")}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition duration-200"
+            >
+              ←
+            </button>
+            <h2 className="text-xl font-semibold min-w-[200px] text-center">
+              {monthYear}
+            </h2>
+            <button
+              onClick={() => navigateMonth("next")}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition duration-200"
+            >
+              →
+            </button>
           </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition duration-200 shadow-lg"
-          >
-            + Add Event
-          </button>
         </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition duration-200 shadow-lg"
+        >
+          + Add Event
+        </button>
       </div>
 
-      {events.length === 0 ? (
-        <div className="text-center py-10 px-6 bg-gray-800/40 rounded-lg shadow-md">
-          <h2 className="text-xl text-gray-300 mb-4">
-            No upcoming events found.
-          </h2>
-          <p className="text-gray-400 mb-6">
-            Your calendar is empty. Create your first event to get started!
-          </p>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="px-6 py-3 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition duration-200 shadow-lg text-lg font-semibold"
-          >
-            Create Your First Event
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {events.map((event) => (
+      {/* Calendar Grid */}
+      <div className="bg-gray-800/50 rounded-lg overflow-hidden shadow-lg">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 border-b border-gray-700">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div
-              key={event.id}
-              className="bg-gray-800/70 p-6 rounded-lg shadow-lg border border-gray-700 hover:shadow-indigo-500/20 hover:border-indigo-600/50 transition-all duration-300"
+              key={day}
+              className="p-4 text-center font-semibold text-gray-300 bg-gray-800"
             >
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between">
-                <div className="flex-1 mb-4 md:mb-0 md:mr-6">
-                  <h3 className="text-xl font-semibold text-white mb-2">
-                    {event.summary}
-                  </h3>
-
-                  {event.description && (
-                    <p className="text-sm text-gray-300 mb-3 line-clamp-3">
-                      {event.description}
-                    </p>
-                  )}
-
-                  {event.location && (
-                    <p className="text-sm text-indigo-300 mb-2">
-                      📍 {event.location}
-                    </p>
-                  )}
-
-                  {event.attendees && event.attendees.length > 0 && (
-                    <div className="text-sm text-gray-400 mb-2">
-                      👥 {event.attendees.length} attendee
-                      {event.attendees.length !== 1 ? "s" : ""}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col items-end space-y-3">
-                  <div className="text-right">
-                    <p
-                      className={`text-sm font-medium ${getEventTimeColor(
-                        event.start
-                      )}`}
-                    >
-                      {formatEventDate(event.start, event.is_all_day)}
-                    </p>
-                    {!event.is_all_day && (
-                      <p className="text-xs text-gray-500">
-                        to {formatEventDate(event.end, event.is_all_day)}
-                      </p>
-                    )}
-                    {event.is_all_day && (
-                      <p className="text-xs text-gray-500">All day event</p>
-                    )}
-                  </div>
-
-                  <a
-                    href={event.html_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition duration-200 shadow-md"
-                  >
-                    View in Google Calendar
-                  </a>
-                </div>
-              </div>
+              {day}
             </div>
           ))}
         </div>
-      )}
+
+        {/* Calendar days */}
+        <div className="grid grid-cols-7">
+          {calendarDays.map((date, index) => {
+            if (!date) {
+              return (
+                <div
+                  key={`empty-${index}`}
+                  className="h-32 border-r border-b border-gray-700 bg-gray-900/50"
+                />
+              );
+            }
+
+            const dayEvents = getEventsForDate(date);
+            const isCurrentDay = isToday(date);
+
+            return (
+              <div
+                key={date.toISOString()}
+                className={`h-32 border-r border-b border-gray-700 p-2 relative overflow-hidden hover:bg-gray-700/50 transition-colors ${
+                  isCurrentDay ? "bg-indigo-900/30" : "bg-gray-800/30"
+                }`}
+              >
+                {/* Day number */}
+                <div
+                  className={`text-sm font-medium mb-1 ${
+                    isCurrentDay ? "text-indigo-300 font-bold" : "text-gray-300"
+                  }`}
+                >
+                  {date.getDate()}
+                </div>
+
+                {/* Events for this day */}
+                <div className="space-y-1">
+                  {dayEvents.slice(0, 3).map((event, eventIndex) => (
+                    <div
+                      key={event.id}
+                      className="text-xs p-1 bg-indigo-600/80 rounded text-white truncate cursor-pointer hover:bg-indigo-600 transition-colors"
+                      title={event.summary}
+                    >
+                      {event.is_all_day ? (
+                        event.summary
+                      ) : (
+                        <>
+                          {new Date(event.start).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}{" "}
+                          {event.summary}
+                        </>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Show "more" indicator if there are additional events */}
+                  {dayEvents.length > 3 && (
+                    <div className="text-xs text-gray-400 font-medium">
+                      +{dayEvents.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Add Event Modal */}
       {showAddForm && (
