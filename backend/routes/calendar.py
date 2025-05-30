@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, abort, redirect
 from flask_cors import CORS
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import logging
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request as GoogleAuthRequest
@@ -12,7 +12,6 @@ from googleapiclient.errors import HttpError
 import json
 from initdb import supabase
 import os
-import pytz
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -116,19 +115,36 @@ def add_calendar_event(google_id):
         ev = CalendarEventCreate(**data)
         service = get_google_calendar_client(google_id)
         
-        # Add timezone information to the datetime strings
-        # Google Calendar API requires timezone info for dateTime fields
+        # Convert datetime strings to ISO format with timezone
+        # If no timezone info is provided, assume Pacific timezone (UTC-8)
+        def ensure_timezone(dt_string):
+            try:
+                # If the string already has timezone info, use it as is
+                if '+' in dt_string or 'Z' in dt_string:
+                    return dt_string
+                
+                # Parse the datetime string
+                dt = datetime.fromisoformat(dt_string)
+                
+                # If no timezone info, assume Pacific timezone (UTC-8)
+                if dt.tzinfo is None:
+                    pacific_tz = timezone(timedelta(hours=-8))  # PST
+                    dt = dt.replace(tzinfo=pacific_tz)
+                
+                return dt.isoformat()
+            except Exception as e:
+                logger.error(f"Error parsing datetime {dt_string}: {e}")
+                # Fallback: add Pacific timezone to the string
+                return dt_string + '-08:00' if 'T' in dt_string and '+' not in dt_string and 'Z' not in dt_string else dt_string
+        
+        start_dt = ensure_timezone(ev.start_datetime)
+        end_dt = ensure_timezone(ev.end_datetime)
+        
         body = {
             'summary': ev.summary,
             'description': ev.description,
-            'start': {
-                'dateTime': ev.start_datetime,
-                'timeZone': 'America/Los_Angeles'  # Default to PST/PDT, could be made configurable
-            },
-            'end': {
-                'dateTime': ev.end_datetime,
-                'timeZone': 'America/Los_Angeles'  # Default to PST/PDT, could be made configurable
-            }
+            'start': {'dateTime': start_dt},
+            'end': {'dateTime': end_dt}
         }
         created = service.events().insert(calendarId='primary', body=body).execute()
         return jsonify({"message":"Event created successfully", "event_details": created}), 201
