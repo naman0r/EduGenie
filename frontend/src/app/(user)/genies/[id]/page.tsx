@@ -284,11 +284,15 @@ const ChatPage: React.FC = () => {
     let resourceType: string | null = null;
 
     // Detect @mindmap annotation (case-insensitive, word boundary)
-    const mindmapRegex = /@mindmap\\b/i;
+    const mindmapRegex = /@mindmap\b/i;
     if (mindmapRegex.test(userMessageText)) {
       resourceType = "mindmap";
-      // Remove the annotation from the message text
-      userMessageText = userMessageText.replace(mindmapRegex, "mindmap").trim();
+      // Remove the @mindmap annotation from the message text
+      userMessageText = userMessageText.replace(mindmapRegex, "").trim();
+      // If the message becomes empty after removing @mindmap, provide a default prompt
+      if (!userMessageText) {
+        userMessageText = "Create a mindmap";
+      }
     }
 
     // If no specific command handled above, proceed to call AI

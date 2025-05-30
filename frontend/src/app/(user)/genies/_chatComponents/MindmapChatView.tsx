@@ -74,10 +74,11 @@ const MindmapChatView: React.FC<MindmapChatViewProps> = ({ content }) => {
 
   return (
     <div style={{ height: 350, width: "100%" }}>
+      <p>Here is your requested mindmap!:</p>
       <ReactFlow
         nodes={layoutedNodes}
         edges={safeEdges}
-        fitView
+        fitView={true}
         panOnDrag={true}
         zoomOnScroll={false}
         zoomOnPinch={true}
@@ -85,11 +86,13 @@ const MindmapChatView: React.FC<MindmapChatViewProps> = ({ content }) => {
         nodesDraggable={true}
         nodesConnectable={true}
         elementsSelectable={true}
-        className="bg-slate-900 rounded-lg border border-slate-700"
+        className="bg-blue-950 rounded-lg border border-lime-700"
       >
         <Background gap={16} size={1} color="#334155" />
-        <MiniMap pannable={false} zoomable={false} />
+        {/*<MiniMap pannable={false} zoomable={false} />*/}
       </ReactFlow>
+      {/*Add more functionality here, like save to resources, maybe a dowbload button? */}
+      {/** make this cost credits */}
     </div>
   );
 };
