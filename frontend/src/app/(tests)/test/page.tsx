@@ -58,6 +58,7 @@ const TestPage = () => {
       </p>
       <p>is canvas integrated: {isCanvasIntegrated && "true"}</p>
       <p>user profile: {JSON.stringify(userProfile)}</p>
+      <p>user id : {firebaseUser?.uid}</p>
     </div>
   );
 };

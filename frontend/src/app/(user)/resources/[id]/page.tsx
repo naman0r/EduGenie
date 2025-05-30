@@ -45,7 +45,7 @@ const ResourceDetailPage = () => {
       setError(null);
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${userId}/resources/${resourceId}`
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/${firebaseUser?.uid}/resources/${resourceId}`
         );
 
         if (!response.ok) {
