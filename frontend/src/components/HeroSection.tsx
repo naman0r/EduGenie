@@ -91,9 +91,9 @@ const RotatingTypewriter = ({
 
 const HeroSection = () => {
   const examplePrompts = [
-    "Ask EduGenie to generate a mindmap on SWOT analysis of a business",
-    "Ask EduGenie to make flashcards for chapter 4 of my organic chemistry class",
-    "Ask EduGenie to generate a video on introducing group theory",
+    "Ask Genie to generate a mindmap on SWOT analysis of a business",
+    "Ask Genie to make flashcards for chapter 4 of my organic chemistry class",
+    "Ask Genie to generate a video on introducing group theory",
   ];
   return (
     <div className="relative w-full min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden rounded-md pt-20 pb-10 md:pt-24 md:pb-16 px-4 font-mono">
@@ -118,7 +118,7 @@ const HeroSection = () => {
         </h1>
 
         <p className="mt-4 mb-8 text-base md:text-lg lg:text-xl text-neutral-300 max-w-3xl">
-          EduGenie transforms your study routine with personalized plans, smart
+          CascadeAI transforms your study routine with personalized plans, smart
           summaries, content generation tools, and seamless organization.
         </p>
 
@@ -140,7 +140,7 @@ const HeroSection = () => {
         </Link>
 
         <h2 className="text-2xl md:text-3xl font-semibold text-neutral-200 mb-8 md:mb-10">
-          How EduGenie Helps You Succeed
+          How CascadeAI Helps You Succeed
         </h2>
 
         <ul className="w-full max-w-6xl grid grid-cols-1 grid-rows-none gap-4 md:grid-cols-12 md:grid-rows-3 lg:gap-4 xl:max-h-[34rem] xl:grid-rows-2">
