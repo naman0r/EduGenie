@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, FormEvent } from "react";
 import { useParams } from "next/navigation"; // To get ID from URL
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext"; // Added
+import VideoPlayerComponent from "../_chatComponents/VideoPlayerComponent";
 
 interface ChatMessage {
   id: string; // UUID
@@ -388,41 +389,36 @@ const ChatPage: React.FC = () => {
                   (msg.resource_type === "mindmap" ||
                     msg.resource_type === "video") &&
                   msg.content
-                    ? { width: "100%", height: "400px", minWidth: "300px" }
+                    ? {
+                        width: "100%",
+                        minWidth: "300px",
+                        maxWidth: "90%",
+                      }
                     : {}
                 }
               >
+                {/* Always show message text if it exists */}
+                {msg.message_text && (
+                  <div className="mb-3">
+                    <p className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap">
+                      {msg.message_text}
+                    </p>
+                  </div>
+                )}
+
                 {/* Render mindmap if AI and resource_type is mindmap and content exists */}
                 {msg.sender === "ai" &&
-                msg.resource_type === "mindmap" &&
-                msg.content ? (
-                  <MindmapChatView content={msg.content} />
-                ) : msg.sender === "ai" &&
+                  msg.resource_type === "mindmap" &&
+                  msg.content && (
+                    <div className="w-full h-96">
+                      <MindmapChatView content={msg.content} />
+                    </div>
+                  )}
+
+                {/* Render video if AI and resource_type is video and content exists */}
+                {msg.sender === "ai" &&
                   msg.resource_type === "video" &&
-                  msg.content ? (
-                  /* Render video if AI and resource_type is video and content exists */
-                  <div className="w-full h-full">
-                    <div className="mb-2">
-                      <h3 className="text-sm font-semibold text-slate-300">
-                        Generated Video:
-                      </h3>
-                    </div>
-                    <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
-                      <video
-                        controls
-                        src={msg.content.video_url || msg.content.url}
-                        className="w-full h-full"
-                        preload="metadata"
-                      >
-                        Your browser does not support the video tag.
-                      </video>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap">
-                    {msg.message_text}
-                  </p>
-                )}
+                  msg.content && <VideoPlayerComponent content={msg.content} />}
               </div>
             </div>
           ))}

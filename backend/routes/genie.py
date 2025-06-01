@@ -319,96 +319,139 @@ def generate_mindmap_for_genie(user_prompt):
 
 # Video generation function (moved from video.py for integration)
 def generate_video_for_genie(user_prompt):
-    """Generate video content for genie chat integration"""
+    """Generate actual video content with slides and synchronized audio"""
     if not client:
         abort(500, description="OpenAI client not initialized due to missing API key.")
     
     try:
-        # For now, we'll create a simple video generation approach
-        # In production, you'd integrate with actual video services
+        logger.info(f"Starting video generation for prompt: {user_prompt[:100]}...")
         
-        # Generate TTS audio using OpenAI
-        logger.info("Generating TTS audio for video...")
-        audio_response = client.audio.speech.create(
-            model="tts-1",
-            voice="alloy", 
-            input=user_prompt
+        # Step 1: Generate structured script for slides
+        logger.info("Generating video script with slide breakdown...")
+        script_response = client.chat.completions.create(
+            model="gpt-4o",
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system", 
+                    "content": """You are an educational video script writer. Create a structured script for a simple slide-based video.
+
+Output a JSON object with:
+{
+  "title": "Video title",
+  "slides": [
+    {
+      "text": "Text to display on this slide (keep it concise, max 2-3 lines)",
+      "narration": "What to say while this slide is shown",
+      "duration": 4.0
+    }
+  ]
+}
+
+Guidelines:
+- Create 3-6 slides maximum
+- Each slide text should be concise and readable
+- Narration should match the slide content
+- Duration in seconds (3-6 seconds per slide)
+- Focus on key concepts, not lengthy explanations
+- Use simple, clear language"""
+                },
+                {"role": "user", "content": f"Create an educational video script about: {user_prompt}"}
+            ]
         )
         
-        # Upload to Supabase Storage (simplified for demo)
+        script_data = json.loads(script_response.choices[0].message.content)
+        logger.info(f"Generated script with {len(script_data['slides'])} slides")
+        
+        # Step 2: Generate TTS audio for the complete narration
+        logger.info("Generating TTS audio...")
+        full_narration = " ".join([slide['narration'] for slide in script_data['slides']])
+        
+        audio_response = client.audio.speech.create(
+            model="tts-1-hd",
+            voice="nova",
+            input=full_narration,
+            speed=0.95
+        )
+        
+        # Step 3: Upload audio to Supabase
         job_id = str(uuid4())
+        ensure_video_bucket_exists()
         
-        # Create video bucket if it doesn't exist, and ensure it's public
-        try:
-            logger.info("Checking if generated-videos bucket exists...")
-            bucket_response = supabase.storage.get_bucket("generated-videos")
-            logger.info(f"Bucket response: {bucket_response}")
-            
-            # Check if bucket is public, if not make it public
-            if hasattr(bucket_response, 'public') and not bucket_response.public:
-                logger.info("Bucket exists but is private, updating to public...")
-                try:
-                    update_response = supabase.storage.update_bucket("generated-videos", {"public": True})
-                    logger.info(f"Bucket updated to public: {update_response}")
-                except Exception as update_error:
-                    logger.warning(f"Could not update bucket to public: {update_error}")
-                    
-        except Exception as e:
-            logger.info(f"Bucket doesn't exist, creating it as public. Error: {e}")
-            try:
-                # Create bucket as public (Python API)
-                create_response = supabase.storage.create_bucket("generated-videos", {"public": True})
-                logger.info(f"Public bucket created successfully: {create_response}")
-            except Exception as create_error:
-                logger.error(f"Failed to create public bucket: {create_error}")
-                # Continue anyway - maybe it exists but get_bucket failed
+        audio_filename = f"video_{job_id}_audio.mp3"
+        logger.info(f"Uploading audio: {audio_filename}")
         
-        # Upload audio as temporary video content
-        audio_filename = f"video_{job_id}.mp3"
-        audio_bytes = audio_response.content
-        
-        logger.info(f"Uploading {audio_filename} to generated-videos bucket...")
         upload_response = supabase.storage.from_("generated-videos").upload(
-            audio_filename, 
-            audio_bytes,
+            audio_filename,
+            audio_response.content,
             {"contentType": "audio/mpeg"}
         )
-        logger.info(f"Upload response: {upload_response}")
         
-        # Check for upload errors (Supabase Python client response handling)
         if hasattr(upload_response, 'error') and upload_response.error:
-            raise Exception(f"Failed to upload video content: {upload_response.error}")
+            raise Exception(f"Failed to upload audio: {upload_response.error}")
         
-        # Get public URL
-        logger.info(f"Getting public URL for {audio_filename}...")
-        url_response = supabase.storage.from_("generated-videos").get_public_url(audio_filename)
-        logger.info(f"URL response: {url_response}")
-        
-        # Check for URL errors (different response structure)
-        if hasattr(url_response, 'error') and url_response.error:
-            raise Exception(f"Failed to get public URL: {url_response.error}")
-        
-        # Extract the URL correctly based on Supabase Python client structure
-        if hasattr(url_response, 'data') and hasattr(url_response.data, 'publicUrl'):
-            video_url = url_response.data.publicUrl
-        elif hasattr(url_response, 'publicUrl'):
-            video_url = url_response.publicUrl
+        # Get audio URL
+        audio_url = supabase.storage.from_("generated-videos").get_public_url(audio_filename)
+        if isinstance(audio_url, str):
+            audio_public_url = audio_url
         else:
-            # Fallback - try to access as dict
-            video_url = url_response.get('publicUrl') if hasattr(url_response, 'get') else str(url_response)
+            audio_public_url = getattr(audio_url, 'publicUrl', str(audio_url))
         
-        logger.info(f"Final video URL: {video_url}")
-        
-        # Return video content structure
-        return {
-            "video_url": video_url,
-            "job_id": job_id,
-            "status": "completed"
+        # Step 4: Return video generation data for frontend processing
+        # The frontend will handle Canvas rendering and ffmpeg.wasm compilation
+        video_content = {
+            "video_id": job_id,
+            "title": script_data.get("title", "Generated Educational Video"),
+            "type": "slide_video",
+            "status": "ready_for_compilation",
+            "audio_url": audio_public_url,
+            "slides": script_data['slides'],
+            "total_duration": sum(slide.get('duration', 4.0) for slide in script_data['slides']),
+            "format": "slide_compilation",
+            "video_settings": {
+                "width": 1280,
+                "height": 720,
+                "fps": 30,
+                "background_color": "#000000",
+                "text_color": "#FFFFFF",
+                "font_family": "Arial, sans-serif",
+                "font_size": 48,
+                "text_align": "center"
+            },
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
+        
+        logger.info(f"Video generation data prepared for job {job_id}")
+        return video_content
         
     except Exception as e:
         logger.error(f"Error generating video for genie: {e}")
         raise
+
+
+def ensure_video_bucket_exists():
+    """Helper function to ensure the video bucket exists and is public"""
+    try:
+        logger.info("Checking if generated-videos bucket exists...")
+        bucket_response = supabase.storage.get_bucket("generated-videos")
+        
+        # Check if bucket is public, if not make it public
+        if hasattr(bucket_response, 'public') and not bucket_response.public:
+            logger.info("Bucket exists but is private, updating to public...")
+            try:
+                supabase.storage.update_bucket("generated-videos", {"public": True})
+                logger.info("Bucket updated to public")
+            except Exception as update_error:
+                logger.warning(f"Could not update bucket to public: {update_error}")
+                
+    except Exception as e:
+        logger.info(f"Bucket doesn't exist, creating it as public. Error: {e}")
+        try:
+            supabase.storage.create_bucket("generated-videos", {"public": True})
+            logger.info("Public bucket created successfully")
+        except Exception as create_error:
+            logger.error(f"Failed to create public bucket: {create_error}")
+            # Continue anyway - maybe it exists but get_bucket failed
         
     
 
