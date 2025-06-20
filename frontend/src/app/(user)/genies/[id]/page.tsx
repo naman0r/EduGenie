@@ -85,7 +85,7 @@ const ChatPage: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // --- Handle Message Submission ---
+  // --- Handle Message Submission ---e
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!newMessage.trim() || isSending) return;
